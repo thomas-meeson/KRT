@@ -7,6 +7,8 @@
   <title>Ahead of the Spike · Wikipedia cache replay</title>
   <link rel="stylesheet" href="styles.css">
   <script src="foresight.js" defer></script>
+  <script src="spikes.js" defer></script>
+  <script src="presentation.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -18,7 +20,22 @@
     <div id="status" class="status" role="status" aria-live="polite">Loading the supplied replay dataset…</div>
     <button id="retry" type="button" hidden>Try loading again</button>
     <div id="replay" hidden>
-      <section class="replay-heading" aria-labelledby="snapshot-title"><div><p class="eyebrow">01 / REPLAY THE DAY</p><h2 id="snapshot-title">Wikipedia, one hour at a time.</h2></div><div class="timestamp"><time id="hour"></time><span id="interval"></span></div></section>
+      <nav class="pitch-nav" aria-label="Three-minute demo journey">
+        <span class="pitch-label">THE 3-MINUTE STORY</span>
+        <a href="#summary-title">1. Compare</a>
+        <a href="#snapshot-title">2. Replay</a>
+        <a href="#spike-title">3. Catch a surge</a>
+        <a href="#foresight-title">4. Look ahead</a>
+        <a href="#limits-title">5. Limits</a>
+        <button id="pitch-start" type="button" class="secondary">Reset walkthrough</button>
+      </nav>
+      <section class="summary-panel" aria-labelledby="summary-title">
+        <div class="section-heading"><div><p class="eyebrow">THE QUESTION / CAN FORECASTING IMPROVE THE CACHE?</p><h2 id="summary-title" tabindex="-1">The supplied comparison, at a glance.</h2></div><span id="summary-origin" class="chart-origin"></span></div>
+        <p id="summary-scope" class="metric-note"></p>
+        <dl id="summary-values" class="summary-grid"></dl>
+        <p id="oracle-note" class="metric-note"></p>
+      </section>
+      <section class="replay-heading" aria-labelledby="snapshot-title"><div><p class="eyebrow">01 / REPLAY THE DAY</p><h2 id="snapshot-title" tabindex="-1">Wikipedia, one hour at a time.</h2></div><div class="timestamp"><time id="hour"></time><span id="interval"></span></div></section>
       <section class="transport" aria-label="Replay controls">
         <div class="transport-buttons">
           <button id="previous" type="button" class="secondary" aria-label="Previous available hour">← Previous</button>
@@ -39,7 +56,7 @@
       <section class="leaderboard" aria-labelledby="leaderboard-title"><div class="section-heading"><div><p class="eyebrow">02 / WHERE ATTENTION LANDED</p><h2 id="leaderboard-title">The most-read articles</h2></div><p id="page-count"></p></div><p class="table-hint" id="table-hint">Cache decisions: ✓ Cached · × Missed · — Unavailable. Scroll horizontally on smaller screens.</p><div class="table-scroll" role="region" aria-label="Article leaderboard" aria-describedby="table-hint" tabindex="0"><table><caption class="sr-only">Article views and cache status for each supplied model at the selected hour</caption><thead id="table-head"></thead><tbody id="table-body"></tbody></table></div></section>
       <section class="foresight" aria-labelledby="foresight-title">
         <div class="section-heading">
-          <div><p class="eyebrow">03 / THE COST OF LOOKING AHEAD</p><h2 id="foresight-title">What is foresight worth?</h2></div>
+          <div><p class="eyebrow">03 / THE COST OF LOOKING AHEAD</p><h2 id="foresight-title" tabindex="-1">What is foresight worth?</h2></div>
           <span id="foresight-origin" class="chart-origin"></span>
         </div>
         <p class="foresight-intro">How does cache hit rate change when articles must be chosen further ahead? Compare the supplied results at each forecast horizon.</p>
@@ -53,10 +70,27 @@
         </div>
         <p class="metric-note">Lines connect supplied points only. No intermediate forecasts or confidence intervals are inferred. Synthetic or unverified results do not establish a performance advantage.</p>
       </section>
+      <section class="spike-story" aria-labelledby="spike-title">
+        <div class="section-heading">
+          <div><p class="eyebrow">04 / WHEN ATTENTION SURGES</p><h2 id="spike-title" tabindex="-1">Who caught the wave?</h2></div>
+          <span id="spike-origin" class="chart-origin"></span>
+        </div>
+        <p id="spike-status" class="metric-note"></p>
+        <label for="spike-select" class="spike-label">Explore a supplied event</label>
+        <select id="spike-select" aria-describedby="spike-status"></select>
+        <div id="spike-content" hidden>
+          <div class="spike-heading"><div><h3 id="spike-name"></h3><p id="spike-time"></p></div><button id="spike-jump" type="button" class="secondary">Show event hour in replay</button></div>
+          <p id="spike-warning" class="spike-warning" role="status" hidden></p>
+          <dl id="spike-lags" class="catch-grid"></dl>
+          <p id="spike-comparison" class="spike-comparison" aria-live="polite"></p>
+          <p class="metric-note">Line and circles: article views. Dotted line: supplied onset. Squares in separate lanes: reported catch times within this window. Scroll the chart horizontally on smaller screens.</p>
+          <div class="chart-scroll" role="region" aria-label="Spike view trajectory" tabindex="0"><svg id="spike-chart" role="img" aria-labelledby="spike-chart-title"></svg></div>
+          <details class="spike-details"><summary>Inspect supplied hourly view counts</summary><div class="spike-table" role="region" aria-label="Spike hourly values" tabindex="0"><table><caption>Counts from the selected supplied record</caption><thead><tr><th scope="col">Hour (UTC)</th><th scope="col">Views</th></tr></thead><tbody id="spike-values"></tbody></table></div></details>
+          <p class="metric-note">0h means cached at arrival. A 24h lag is capped and may indicate no catch within 24 hours; it is not an exact catch time. Synthetic or unverified events do not establish real-world findings.</p>
+        </div>
+      </section>
     </div>
-    <aside class="limits" aria-labelledby="limits-title"><p class="eyebrow">READ THE RESULTS HONESTLY</p><h2 id="limits-title">A useful model. A simplified world.</h2><div class="limit-grid"><p><strong>Hourly decisions</strong>Cache choices happen once an hour, rather than for every request.</p><p><strong>Equal page sizes</strong>Every article occupies one slot; actual byte sizes are not modelled.</p><p><strong>Sudden shocks</strong>Hourly history cannot reliably anticipate a first-hour surge with no prior signal.</p></div><p class="development-note">Development preview: explore the supplied hours with the replay controls. Story charts are planned for later increments. Synthetic or unverified values are not evidence of model performance.</p></aside>
+    <aside class="limits" aria-labelledby="limits-title"><p class="eyebrow">READ THE RESULTS HONESTLY</p><h2 id="limits-title" tabindex="-1">A useful model. A simplified world.</h2><div class="limit-grid"><p><strong>Hourly decisions</strong>Cache choices happen once an hour, rather than for every request.</p><p><strong>Equal page sizes</strong>Every article occupies one slot; actual byte sizes are not modelled.</p><p><strong>Sudden shocks</strong>Hourly history cannot reliably anticipate a first-hour surge with no prior signal.</p></div><p class="development-note">Development preview: explore the supplied hours with the replay controls. The event stories and foresight curve use supplied outputs. Synthetic or unverified values are not evidence of model performance.</p></aside>
   </main><footer><span>AHEAD OF THE SPIKE</span><span>English Wikipedia · all times UTC</span></footer>
 </body>
 </html>
-
-

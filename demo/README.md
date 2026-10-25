@@ -32,17 +32,43 @@ Missing/invalid values break lines; ambiguous array lengths invalidate the
 affected series. Duplicate or unsupported horizon definitions are rejected for
 the chart without blocking the replay. No results are recomputed.
 
-The supplied updated `INTERFACES (1).md` is the contract used for this increment.
-The repository's root interface document has not been replaced. `our_model`
+The repository's updated `INTERFACES.md` is the contract used for this increment.
+`our_model`
 remains a lookup key; `our_model_name`, when non-empty, is used for display in
 metrics, the leaderboard and chart. Older fixtures lacking it retain their key
-as a label. The updated contract also introduces `summary.oracle_hit_rate`, but
-does not define its type or horizon scope; it is not plotted as a multi-horizon
-ceiling. Computing needs to clarify this before that feature is added.
-Spike zeros may stand for missing or out-of-range hours under the new contract;
-future spike storytelling must not treat these as verified zero traffic.
+as a label. Inspection of the updated `backtest.py` confirms that
+`summary.oracle_hit_rate` is the horizon-1 ceiling at the replay cache size;
+it is not plotted as a multi-horizon curve.
+The presentation summary displays this scalar alongside the supplied
+`summary.hit_rate` values and labels all of them as test-period, horizon-1
+results, distinct from the selected hourly replay. Missing/invalid oracle
+values stay Unavailable. The oracle uses future observations and is not a
+deployable predictor.
 
-Model selection and spike charts are later increments.
+The five story links pause playback and navigate with keyboard focus to the
+comparison, replay, spike story, foresight and limitations. Reset walkthrough
+pauses playback and returns to the first available replay hour and summary.
+See `PITCH.md` for rehearsal and `PROGRESS.md` for remaining handoffs.
+
+The spike selector uses supplied records only. View counts and reported catch
+lags appear in a trajectory, separate catch-time lanes, numerical readouts and
+an expandable values table. The event button pauses and jumps the main replay
+to the exact onset if that hour is available, then moves focus to the timeline.
+Selecting an event itself does not change replay state.
+
+Malformed records (invalid timestamps, duplicate hours, missing onset or
+misaligned views arrays) are omitted with a count. Invalid observations and zero
+values break the trajectory: the contract uses zero for missing/out-of-range
+data, so exact zero traffic cannot be established. Nonconsecutive timestamps
+also break lines. The values table retains zero as a supplied, uncertain count.
+Lag 0 means at arrival; lag 24 is capped, never an exact catch marker or an input
+to an earlier-response claim. Invalid lags show Unavailable. Exact catch markers
+outside the trajectory window are described without extending the view data.
+Records below the 1,000-view onset minimum are flagged; relative-response claims
+are withheld. The 24-hour median criterion cannot be checked from the short
+window, so event classification remains supplied, not frontend-verified.
+
+Model selection is a later increment.
 
 `_fake: true` is recognised as synthetic. Its absence or false value is **not**
 proof of real data: the page defaults to DEVELOPMENT DATA / UNVERIFIED. A verified

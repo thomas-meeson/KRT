@@ -189,7 +189,9 @@ async function load() {
       throw new Error('The replay file is not valid JSON.');
     }
     replay = { data, ...validate(data) };
+    renderPresentation(data);
     renderForesight(data);
+    initializeSpikes(data);
     render();
   } catch (error) {
     element('status').className = 'status error';
