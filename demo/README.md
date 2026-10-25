@@ -8,6 +8,11 @@ python -m http.server 8000 --bind 127.0.0.1
 
 Open http://127.0.0.1:8000/demo/#start. Serve the root, not only demo/.
 
+For the interactive decision explorer, replay cache flags and article lookup,
+run the FastAPI server instead: `uvicorn api:app --port 8000` (same URL).
+api-client.js detects the API; without it every page falls back to the
+behaviour below. lookup.js holds the article panel and header-search results.
+
 ## Visitor journey
 
 Start here explains the problem. Explore a day shows hourly article demand and

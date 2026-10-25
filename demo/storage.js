@@ -15,13 +15,19 @@ function renderStorageComparison(data = replay?.data) {
   element('storage-answer').hidden = !ready;
   if (!ready) return;
   const label = modelLabel(data, storageMethod);
-  for (const [index, profile] of [small, large].entries()) {
+  // The 1,000 article result is published in results.csv and served by the local API.
+  const smallest = storageSmallest?.methods?.[storageMethod === 'our_model' ? 'xgboost' : storageMethod];
+  const profiles = isRate(smallest?.hit_rate)
+    ? [{ cache_size: 1000, summary: { hit_rate: { [storageMethod]: smallest.hit_rate } } }, small, large] : [small, large];
+  container.classList.toggle('three-sizes', profiles.length === 3);
+  for (const [position, profile] of profiles.entries()) {
+    const index = position === profiles.length - 1 ? 1 : 0;
     const value = profile.summary.hit_rate[storageMethod];
     const card = node('article', undefined, `storage-card${index ? ' larger' : ''}`);
-    card.append(node('p', index ? 'More room' : 'Less room', 'eyebrow'), node('h2', `${number.format(profile.cache_size)} articles`));
+    card.append(node('p', index ? 'More room' : position === 0 && profiles.length === 3 ? 'Least room' : 'Less room', 'eyebrow'), node('h2', `${number.format(profile.cache_size)} articles`));
     const slots = node('div', undefined, 'capacity-picture');
     slots.setAttribute('aria-hidden', 'true');
-    for (let i = 0; i < 10; i++) slots.append(node('span', undefined, i === 0 || index === 1 ? 'filled' : ''));
+    for (let i = 0; i < 10; i++) slots.append(node('span', undefined, i < profile.cache_size / 10000 ? 'filled' : profile.cache_size < 10000 && i === 0 ? 'partial' : ''));
     card.append(slots, node('p', label, 'storage-method-label'), node('p', percent.format(value), 'storage-rate'), node('p', 'of recorded views served from fast storage', 'metric-note'));
     const meter = node('div', undefined, 'meter storage-meter');
     meter.setAttribute('role', 'meter');
@@ -39,7 +45,16 @@ function renderStorageComparison(data = replay?.data) {
   const difference = (large.summary.hit_rate[storageMethod] - small.summary.hit_rate[storageMethod]) * 100;
   element('storage-answer').replaceChildren(node('h2', difference > 0 ? 'More room helped this approach.' : 'Read the measured difference.'),
     node('p', `With ${label.toLowerCase()}, the larger store served ${Math.abs(difference).toFixed(2)} percentage points ${difference >= 0 ? 'more' : 'fewer'} recorded views. Both results use the same 72 evaluated hours and choose articles one hour ahead.`),
-    node('p', 'This is the effect of storage capacity. The previous page compared forecasting with the standard rule at the same capacity.', 'metric-note'));
+    node('p', `This is the effect of storage capacity.${profiles.length === 3 ? ` The 1,000 article cache served ${percent.format(profiles[0].summary.hit_rate[storageMethod])} with the same method and planning time.` : ''} The previous page compared forecasting with the standard rule at the same capacity.`, 'metric-note'));
+}
+
+let storageSmallest = null;
+async function loadStorageExtras() {
+  if (!apiAvailable || storageSmallest) return;
+  try {
+    storageSmallest = await getCompare(1000, 1);
+    renderStorageComparison();
+  } catch { /* The two confirmed capacities remain on show. */ }
 }
 
 document.querySelectorAll('[name="storage-method"]').forEach(input => input.addEventListener('change', event => {

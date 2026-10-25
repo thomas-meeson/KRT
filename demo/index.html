@@ -7,12 +7,14 @@
   <title>Ahead of the Spike · Understand, explore, discover</title>
   <link rel="stylesheet" href="styles.css">
   <script src="provenance.js" defer></script>
+  <script src="api-client.js" defer></script>
   <script src="foresight.js" defer></script>
   <script src="spikes.js" defer></script>
   <script src="presentation.js" defer></script>
   <script src="journey.js" defer></script>
   <script src="storage.js" defer></script>
   <script src="replay-data.js" defer></script>
+  <script src="lookup.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -56,14 +58,14 @@
     <div id="replay" hidden>
       <section class="journey-view" data-view="explore" hidden aria-labelledby="snapshot-title">
         <div class="view-intro"><p class="eyebrow">STEP 2 OF 3 · COMPARE THE OUTCOMES</p><h1 id="snapshot-title" tabindex="-1">Two methods.<br>One recorded day.</h1><p>Press Play to compare the standard rule and our model as the day unfolds. The percentages are their measured cache results. The article list shows what people actually read.</p></div>
-        <aside class="replay-scope"><strong>100,000 article spaces. Choices made one hour ahead.</strong><span>Both methods use earlier data. We score their choices against the actual views in the selected hour.</span></aside>
+        <aside class="replay-scope"><strong id="replay-scope-title">100,000 article spaces. Choices made one hour ahead.</strong><span id="replay-scope-text">Both methods use earlier data. We score their choices against the actual views in the selected hour.</span><fieldset class="horizon-picker replay-capacity"><legend>Replay capacity</legend><label><input type="radio" name="replay-capacity" value="100000" checked><span>100,000 articles · hourly scores</span></label><label><input type="radio" name="replay-capacity" value="10000"><span>10,000 articles · scores and each article's cache status</span></label></fieldset></aside>
         <div class="replay-toolbar"><div class="timestamp"><time id="hour"></time><span id="interval"></span></div><span class="scope-chip" id="capacity"></span></div>
         <section class="transport" aria-label="Replay controls">
           <div class="transport-buttons"><button id="previous" type="button" class="secondary" aria-label="Previous available hour">← Previous hour</button><button id="play" type="button">Play</button><button id="next" type="button" class="secondary" aria-label="Next available hour">Next hour →</button></div>
           <div class="timeline-control"><div class="timeline-heading"><label for="timeline">Move through the day</label><span id="playback-state"></span></div><input id="timeline" type="range" min="0" max="0" step="1" value="0" aria-describedby="coverage"><div class="timeline-ends"><span id="timeline-start"></span><span id="timeline-end"></span></div></div>
           <p id="coverage" class="coverage"></p><p id="replay-announcement" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
         </section>
-        <ol class="decision-sequence" aria-label="How the selected hour is evaluated"><li><span>1. Read earlier data</span><p id="history-cutoff"></p></li><li><span>2. Choose 100,000 articles</span><p>Each method fills its cache before the hour being scored.</p></li><li><span>3. Check actual views</span><p id="observed-window"></p></li></ol>
+        <ol class="decision-sequence" aria-label="How the selected hour is evaluated"><li><span>1. Read earlier data</span><p id="history-cutoff"></p></li><li><span id="choose-step">2. Choose 100,000 articles</span><p>Each method fills its cache before the hour being scored.</p></li><li><span>3. Check actual views</span><p id="observed-window"></p></li></ol>
         <div class="score-heading"><h2>How much of this hour would the cache serve?</h2><span>Cache hit rate</span></div>
         <div class="performance" id="performance" aria-label="Share of views served from fast storage for the selected hour"></div>
         <p class="hourly-gap" id="hourly-gap"></p><p class="metric-note">A cache hit means the requested article was already stored. These percentages measure views the cache would serve, not how many predictions were correct.</p>
@@ -71,6 +73,11 @@
           <div class="section-heading"><div><p class="eyebrow">ACTUAL OBSERVED DEMAND</p><h2 id="leaderboard-title">What people actually read</h2></div><button id="show-pages" type="button" class="text-button" aria-expanded="false" aria-controls="table-body">Show all articles</button></div>
           <p id="page-count" class="metric-note"></p><p class="table-hint" id="table-hint">✓ Ready means already in fast storage. × Not ready means the main server would be needed.</p>
           <div class="table-scroll" role="region" aria-label="Article leaderboard; scroll sideways on small screens" aria-describedby="table-hint" tabindex="0"><table><caption class="sr-only">Actual article views in the selected hour, not predicted values</caption><thead id="table-head"></thead><tbody id="table-body"></tbody></table></div>
+        </section>
+        <section class="leaderboard article-lookup" id="article-lookup" hidden aria-labelledby="article-name">
+          <div class="section-heading"><div><p class="eyebrow">FOLLOW ONE ARTICLE</p><h3 id="article-name" class="article-heading" tabindex="-1"></h3></div><button id="article-close" type="button" class="text-button">Close</button></div>
+          <p id="article-status" class="metric-note" role="status" aria-live="polite"></p>
+          <div id="article-content" hidden><p id="article-summary" class="section-copy"></p><p id="article-scope" class="metric-note"></p><p id="article-spike" class="article-spike" hidden></p><div class="chart-scroll" role="region" aria-label="Recorded article views; scroll sideways on small screens" tabindex="0"><svg id="article-chart" viewBox="0 0 760 260" role="img" aria-labelledby="article-chart-title"></svg></div><details class="spike-details"><summary>See every hour</summary><div class="table-scroll" role="region" aria-label="Hourly article observations" tabindex="0"><table><caption>Recorded views and cache status for this article. Select an hour to show it in the replay.</caption><thead id="article-head"></thead><tbody id="article-values"></tbody></table></div></details></div>
         </section>
         <details class="learn-more"><summary>What exactly am I looking at?</summary><div class="details-content"><p>Each row is an article from the recorded hour. Article popularity is the same whatever the storage capacity. This list shows demand, not which articles were stored.</p><dl class="context"><div><dt>Recorded views this hour</dt><dd id="total"></dd></div><div><dt>Available hours</dt><dd id="hour-count"></dd></div></dl><p>The hourly 100,000 article scores come from Computing's published hourly results. The article list and view counts come from the recorded day. Individual 100,000 article cache choices have not been supplied.</p><p>Percentages use views in the retained top 150,000 English Wikipedia articles each hour, not all Wikipedia traffic or just the rows shown here. The team's cache choices are made hourly and treat articles as equal in size. All times are UTC.</p></div></details>
         <div class="page-end"><a class="back-link" href="#start" data-go="start">← Back to the idea</a><a class="button" href="#results" data-go="results">See the 100,000 article results →</a></div>
@@ -86,11 +93,14 @@
         </section>
         <section class="foresight" aria-labelledby="foresight-title">
           <h2 id="foresight-title" tabindex="-1">What if we have to choose earlier?</h2><p class="section-copy">Six hours ahead means both methods must choose six hours before the hour being scored. The standard rule still reuses the latest observed popularity. Our model forecasts demand for that future hour.</p>
-          <section class="horizon-lab" aria-label="Try different planning horizons">
+          <section class="horizon-lab" aria-label="Try different cache capacities and planning horizons">
+          <fieldset class="horizon-picker capacity-picker"><legend>How many articles can the cache hold?</legend><label><input type="radio" name="cache-capacity" value="1000"><span>1,000</span></label><label><input type="radio" name="cache-capacity" value="10000"><span>10,000</span></label><label><input type="radio" name="cache-capacity" value="100000" checked><span>100,000</span></label></fieldset>
+          <p id="capacity-note" class="metric-note" hidden>Other capacities need the local API server (uvicorn api:app). This view shows the confirmed 100,000 article results.</p>
           <fieldset class="horizon-picker"><legend>How early should both methods choose?</legend><label><input type="radio" name="planning-horizon" value="1" checked><span>1 hour</span></label><label><input type="radio" name="planning-horizon" value="2"><span>2 hours</span></label><label><input type="radio" name="planning-horizon" value="3"><span>3 hours</span></label><label><input type="radio" name="planning-horizon" value="6"><span>6 hours</span></label></fieldset>
           <ol class="planning-timeline"><li><strong>Make the choice</strong><span>Use only earlier views</span></li><li><strong id="planning-wait">Wait 1 hour</strong><span>Keep the planning time equal</span></li><li><strong>Measure actual demand</strong><span>Check which views the cache serves</span></li></ol>
           <div id="horizon-outcome" aria-live="polite" aria-atomic="true"></div>
-          <p class="metric-note">These are published historical results, not a new simulation. Storage stays fixed at 100,000 articles. Bars use a 0–100% scale.</p>
+          <p class="metric-note" id="horizon-note">These are published historical results, not a new simulation. Storage stays fixed at 100,000 articles. Bars use a 0–100% scale.</p>
+          <div id="hourly-explorer" class="hourly-explorer" hidden><h3>Hour by hour</h3><p id="hourly-summary" class="metric-note"></p><ul id="hourly-legend" class="chart-legend" aria-label="Hourly chart series"></ul><div class="chart-scroll" role="region" aria-label="Hourly results chart; scroll sideways on small screens"><svg id="hourly-chart" viewBox="0 0 760 310" role="img" aria-labelledby="hourly-chart-title" tabindex="0"></svg></div><p id="hourly-readout" class="hourly-readout" aria-live="polite"></p><p class="report-links metric-note"><a href="../out/hourly.csv" download>Download hourly results</a> · <a href="../out/value_metrics.csv" download>Download value metrics</a></p></div>
           </section><div id="published-findings" class="findings-grid"></div>
           <details class="learn-more"><summary>Show the chart and technical details</summary><div class="details-content"><p id="findings-note"></p><p id="foresight-status"></p><p id="foresight-coverage"></p><ul id="foresight-legend" class="chart-legend" aria-label="Chart series"></ul><div class="chart-scroll" role="region" aria-label="Results chart; scroll sideways on small screens" tabindex="0"><svg id="foresight-chart" viewBox="0 0 760 340" role="img" aria-labelledby="foresight-chart-title"></svg></div><div class="foresight-values" role="region" aria-label="Exact results" tabindex="0"><table><caption>Share of recorded views served from fast storage</caption><thead id="foresight-head"></thead><tbody id="foresight-body"></tbody></table></div><a href="../out/charts_100k/1_vs_standard_rule.png" target="_blank" rel="noopener">See the published statistical comparison</a></div></details>
         </section>

@@ -22,14 +22,32 @@ function csvRows(text) {
   return rows;
 }
 
+// The replay can show 100,000 space hourly scores, or the replay file's own capacity,
+// whose hit rates and per-article cache flags are supplied directly in demo.json.
+let replayCapacity = 100000;
+function applyReplayCapacity() {
+  const supplied = replay.data.cache_size;
+  const useSupplied = replayCapacity === supplied && isCount(supplied);
+  replay.capacity = useSupplied ? supplied : 100000;
+  replay.hasCacheChoices = replay.capacity === supplied;
+  replay.hours = useSupplied ? replay.suppliedHours : replay.mainHours;
+  document.querySelectorAll('[name="replay-capacity"]').forEach(input => {
+    input.checked = Number(input.value) === replay.capacity;
+    if (Number(input.value) !== 100000) input.disabled = Number(input.value) !== supplied;
+  });
+}
+
 function configureExploreReplay() {
-  replay.capacity = 100000;
-  replay.hasCacheChoices = replay.data.cache_size === replay.capacity;
-  if (replay.hasCacheChoices) return;
+  replay.suppliedHours = replay.hours;
+  replay.mainHours = buildMainHours(replay.hours);
+  applyReplayCapacity();
+}
+
+function buildMainHours(demandHours) {
+  if (replay.data.cache_size === 100000) return demandHours;
   // Demand is independent of cache size; only the capacity-specific scores change.
-  const demandHours = replay.hours;
-  replay.hours = demandHours.map(hour => ({ ...hour, hit_rate: {} }));
-  if (!approvedRun || replay.data._fake === true || !confirmedHourlyText) return;
+  const empty = demandHours.map(hour => ({ ...hour, hit_rate: {} }));
+  if (!approvedRun || replay.data._fake === true || !confirmedHourlyText) return empty;
   try {
     const rows = csvRows(confirmedHourlyText);
     const headings = rows.shift() || [];
@@ -48,9 +66,18 @@ function configureExploreReplay() {
       if (Object.hasOwn(rates.get(time), key)) throw new Error('Duplicate hourly result.');
       rates.get(time)[key] = value;
     }
-    replay.hours = demandHours.map(hour => ({ ...hour, hit_rate: rates.get(hour.hour) || {} }));
+    return demandHours.map(hour => ({ ...hour, hit_rate: rates.get(hour.hour) || {} }));
   } catch {
     // Keep demand visible but never substitute the 10k cache results.
-    replay.hours = demandHours.map(hour => ({ ...hour, hit_rate: {} }));
+    return empty;
   }
 }
+
+document.querySelectorAll('[name="replay-capacity"]').forEach(input => input.addEventListener('change', () => {
+  if (!input.checked || !replay) return;
+  replayCapacity = Number(input.value);
+  pause();
+  applyReplayCapacity();
+  render();
+  element('replay-announcement').textContent = `Showing the replay with space for ${number.format(replay.capacity)} articles.`;
+}));

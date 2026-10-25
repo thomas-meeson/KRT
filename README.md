@@ -101,6 +101,19 @@ Results for a 10,000-page cache are in [`out/charts/`](out/charts/) and [`out/ch
 
 ## Quick start
 
+### Run the website (offline, from the published results)
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate            # macOS/Linux: source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn api:app --host 127.0.0.1 --port 8000
+```
+
+Open <http://127.0.0.1:8000/demo/#start>. FastAPI serves the website and the API from the published files (`demo.json`, `out/results.csv`, `out/hourly.csv`, `out/value_metrics.csv`); no internet is needed. With the API running, the Results page lets you choose any cache size (1,000 / 10,000 / 100,000) and planning horizon (1 / 2 / 3 / 6 h), the day replay can show each article's cache status, and the header search finds articles in the recorded day. Served by a plain static server instead (`python -m http.server`), the site still shows the confirmed 100,000-page results. Endpoint tests: `python -m pytest test_api.py`.
+
+### Rebuild the results
+
 ```bash
 pip install pandas pyarrow numpy scipy xgboost matplotlib requests
 ```

@@ -50,9 +50,14 @@ function render() {
   element('observed-window').textContent = `Recorded views in the hour starting ${dateTime.format(new Date(hour.hour))} UTC.`;
   updateControls();
   element('capacity').textContent = `Space for ${number.format(replay.capacity)} articles`;
+  element('replay-scope-title').textContent = `${number.format(replay.capacity)} article spaces. Choices made one hour ahead.`;
+  element('replay-scope-text').textContent = replay.hasCacheChoices
+    ? `Hit rates and each article's cache status come from the published replay file, recorded with space for ${number.format(replay.capacity)} articles. Both methods use earlier data and are scored against the actual views in the selected hour.`
+    : 'Both methods use earlier data. We score their choices against the actual views in the selected hour.';
+  element('choose-step').textContent = `2. Choose ${number.format(replay.capacity)} articles`;
   element('table-hint').textContent = replay.hasCacheChoices
-    ? '✓ Ready means already in fast storage. × Not ready means the main server would be needed.'
-    : 'This list shows what people read. Individual article readiness is not included in the published 100,000 space results.';
+    ? `✓ Ready means the article was already in that method's ${number.format(replay.capacity)} article cache. × Not ready means the main server would be needed.${apiAvailable ? ' Select an article to follow it through the day.' : ''}`
+    : `This list shows what people read. Individual article readiness is not included in the published 100,000 space results; switch the replay to ${number.format(data.cache_size)} articles to see each article's cache status.${apiAvailable ? ' Select an article to follow it through the day.' : ''}`;
   document.querySelector('.table-scroll').classList.toggle('demand-only', !replay.hasCacheChoices);
   element('total').textContent = isCount(hour.total_views) ? number.format(hour.total_views) : 'Unavailable';
   element('hour-count').textContent = `${hours.length} / 24`;
@@ -105,7 +110,12 @@ function render() {
   visiblePages.forEach((page, index) => {
     const row = node('tr');
     const title = node('th');
-    title.append(node('span', page.page.replaceAll('_', ' '), 'article-title'), node('span', `${number.format(page.views)} views`, 'article-views-mobile'));
+    const name = node(apiAvailable ? 'button' : 'span', page.page.replaceAll('_', ' '), `article-title${apiAvailable ? ' article-link' : ''}`);
+    if (apiAvailable) {
+      name.type = 'button';
+      name.addEventListener('click', () => openArticle(page.page, { reveal: true }));
+    }
+    title.append(name, node('span', `${number.format(page.views)} views`, 'article-views-mobile'));
     title.scope = 'row';
     row.append(node('td', String(index + 1).padStart(2, '0'), 'rank'), title, node('td', number.format(page.views), 'views'));
     for (const name of replay.hasCacheChoices ? data.predictors : []) {
@@ -209,12 +219,15 @@ async function load() {
     }
     replay = { data, ...validate(data) };
     await verifyRun(rawReplay, controller.signal);
+    await detectApi(controller.signal);
     configureExploreReplay();
     await loadEventContext(controller.signal);
     const mainResults = resultDataset(100000, data);
     renderPresentation(mainResults);
     renderForesight(mainResults);
+    refreshExplorer();
     renderStorageComparison(data);
+    loadStorageExtras();
     initializeSpikes(data);
     render();
     showView(requestedView(), { focus: false, updateUrl: true });

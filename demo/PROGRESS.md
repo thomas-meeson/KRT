@@ -18,6 +18,29 @@ Published paired improvements are 1.38 percentage points at one hour and 3.08
 at six. The storage comparison fixes the method and time while changing capacity.
 It does not make hardware price or optimal storage claims.
 
+## Backend integration (design/api-integration, not committed)
+
+The same website now runs on FastAPI (`uvicorn api:app --port 8000`, open
+/demo/). When the API answers, three features switch on inside the existing
+pages; served statically, the site keeps the confirmed 100k behaviour.
+
+- Results: cache capacity (1k/10k/100k) and horizon (1/2/3/6) choices drive
+  /api/compare. Shows all three hit rates with 95% intervals, misses avoided,
+  hours won, paired gain interval, gap closed and a 72-hour hourly chart. The
+  foresight curve and table follow the chosen capacity. 100k/1h shows 86.61%,
+  85.22%, 9.4% fewer misses and 72 of 72 hours; 6h shows 17.1%.
+- Storage: the 1,000 article result is added beside 10k and 100k.
+- Explore: a replay capacity switch. 100k keeps the hourly.csv scores; 10k
+  uses demo.json's own hit rates and per-article cache flags (the only
+  capacity at which flags exist). Article names open a lookup panel.
+- Header search suggests recorded articles from /api/pages; the panel uses
+  /api/page/{title}: hourly views, cache status, spike story link. Unknown
+  titles show "not available in the recorded demo dataset".
+
+value_metrics.csv is not in the SHA-256 manifest; it matches origin/master
+6fe83f8 byte for byte and api.py rejects it if its rates disagree with
+results.csv. out/xgb_report/ exists only on origin/master and is unused.
+
 ## Remaining optional handoff
 
 Computing can supply a native 100k demo.json with top_pages cached statuses and

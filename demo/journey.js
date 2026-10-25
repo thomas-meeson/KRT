@@ -82,9 +82,20 @@ contentsToggle.addEventListener('click', () => {
   sidebar.classList.toggle('is-open', open);
 });
 const searchPanel = document.getElementById('search-results');
+let suggestTimer = null;
+document.getElementById('project-query').addEventListener('input', event => {
+  clearTimeout(suggestTimer);
+  if (!event.target.value.trim()) { searchPanel.hidden = true; return; }
+  suggestTimer = setTimeout(() => runSearch(), 200);
+});
 document.querySelector('.project-search').addEventListener('submit', event => {
   event.preventDefault();
-  const query = document.getElementById('project-query').value.trim().toLocaleLowerCase();
+  clearTimeout(suggestTimer);
+  runSearch({ openExact: true });
+});
+function runSearch(options) {
+  const raw = document.getElementById('project-query').value.trim();
+  const query = raw.toLocaleLowerCase();
   const list = searchPanel.querySelector('ul');
   list.replaceChildren();
   let matches = 0;
@@ -99,9 +110,10 @@ document.querySelector('.project-search').addEventListener('submit', event => {
       matches++;
     });
   });
-  document.getElementById('search-message').textContent = !query ? 'Enter a topic to search this project.' : matches ? 'Matching sections in this project' : 'No matching sections. Try cache, model or storage.';
+  document.getElementById('search-message').textContent = !query ? 'Enter a topic or article to search this project.' : matches ? 'Matching sections in this project' : apiAvailable ? 'Searching recorded articles…' : 'No matching sections. Try cache, model or storage.';
   searchPanel.hidden = false;
-});
+  appendArticleMatches(raw, list, matches, options);
+}
 document.addEventListener('keydown', event => {
   if (event.key !== 'Escape') return;
   if (!searchPanel.hidden) { searchPanel.hidden = true; document.getElementById('project-query').focus(); }
