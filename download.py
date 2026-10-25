@@ -14,13 +14,18 @@ TIP: if the venue wifi is bad, run this in Google Colab (fast datacentre interne
 just the small data/views.parquet. See the README section at the bottom of this docstring.
 
 Usage:
-    python download.py --start "2026-10-15 00:00" --end "2026-10-24 23:00"     # downloads + combines
-    python download.py --start ... --end ... --workers 2                         # gentler on bad wifi
-    python download.py --combine-only                                            # just rebuild views.parquet
+    python download.py                      # 18 Oct 2026 00:00 UTC up to the latest published hour, oldest first
+    python download.py --workers 2          # gentler on bad wifi
+    python download.py --skip-existing other/views.parquet    # skip hours another laptop already has
+    python download.py --combine-only       # just rebuild data/views.parquet from finished hours
+    python download.py --start "2026-10-20 00:00" --end "2026-10-21 23:00" --order newest   # custom range
+
+Hours that Wikimedia hasn't published yet (the last hour or two) are reported as "not published
+yet"; run the command again later to pick them up.
 
 Colab:
     !pip -q install pandas pyarrow requests
-    !python download.py --start "2026-10-15 00:00" --end "2026-10-24 23:00" --workers 4
+    !python download.py --workers 4
     from google.colab import files; files.download("data/views.parquet")
 """
 from __future__ import annotations
@@ -138,8 +143,10 @@ def combine(work: Path, start: pd.Timestamp | None, end: pd.Timestamp | None) ->
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--start", help='first hour, UTC, e.g. "2026-10-15 00:00"')
-    ap.add_argument("--end", help='last hour, UTC, e.g. "2026-10-24 23:00"')
+    ap.add_argument("--start", default="2026-10-18 00:00", help='first hour, UTC (default "2026-10-18 00:00")')
+    ap.add_argument("--end", default=None, help="last hour, UTC (default: the latest hour likely to be published)")
+    ap.add_argument("--order", choices=["oldest", "newest"], default="oldest", help="which hours to fetch first")
+    ap.add_argument("--skip-existing", default=None, help="a views.parquet from elsewhere; its hours are skipped")
     ap.add_argument("--out", default="data")
     ap.add_argument("--top", type=int, default=150_000, help="pages kept per hour")
     ap.add_argument("--workers", type=int, default=3)
@@ -150,30 +157,44 @@ def main() -> None:
     work = Path(args.out)
     (work / "hours").mkdir(parents=True, exist_ok=True)
     (work / "raw").mkdir(parents=True, exist_ok=True)
-    start = pd.Timestamp(args.start) if args.start else None
-    end = pd.Timestamp(args.end) if args.end else None
+    start = pd.Timestamp(args.start)
+    latest_guess = pd.Timestamp.now(tz="UTC").tz_localize(None).floor("h") - pd.Timedelta(hours=2)
+    end = pd.Timestamp(args.end) if args.end else latest_guess
     if args.combine_only:
-        combine(work, start, end)
+        combine(work, None, None)
         return
-    if start is None or end is None:
-        raise SystemExit("--start and --end are required (or use --combine-only)")
 
     hours = list(pd.date_range(start, end, freq="h"))
-    # Newest first: the most recent days are the test period, so get those early.
-    hours.sort(reverse=True)
-    failed = []
+    if args.skip_existing:
+        have = set(pd.DatetimeIndex(pd.read_parquet(args.skip_existing, columns=["hour"])["hour"].unique()))
+        before = len(hours)
+        hours = [h for h in hours if h not in have]
+        print(f"skipping {before - len(hours)} hours already in {args.skip_existing}")
+    hours.sort(reverse=(args.order == "newest"))
+    print(f"{len(hours)} hours to get, {hours[0] if hours else '-'} .. {hours[-1] if hours else '-'} "
+          f"({args.order} first)", flush=True)
+    failed, unpublished = [], []
     with ThreadPoolExecutor(max_workers=args.workers) as pool:
         futures = {pool.submit(do_hour, h, args.base_url, work, args.top): h for h in hours}
         for i, fut in enumerate(as_completed(futures), start=1):
             h = futures[fut]
             try:
-                print(f"[{i}/{len(hours)}] {h}: {fut.result()}")
+                print(f"[{i}/{len(hours)}] {h}: {fut.result()}", flush=True)
+            except FileNotFoundError:
+                if h >= latest_guess - pd.Timedelta(hours=6):
+                    unpublished.append(h)
+                    print(f"[{i}/{len(hours)}] {h}: not published yet", flush=True)
+                else:
+                    failed.append(h)
+                    print(f"[{i}/{len(hours)}] {h}: FAILED (file not found on server)", flush=True)
             except Exception as e:
                 failed.append(h)
-                print(f"[{i}/{len(hours)}] {h}: FAILED ({e})")
+                print(f"[{i}/{len(hours)}] {h}: FAILED ({e})", flush=True)
+    if unpublished:
+        print(f"{len(unpublished)} recent hours not published yet; run again later to get them")
     if failed:
         print(f"{len(failed)} hours failed; just run the same command again to retry them")
-    combine(work, start, end)
+    combine(work, start, min(end, max(hours)) if hours else end)
 
 
 if __name__ == "__main__":
