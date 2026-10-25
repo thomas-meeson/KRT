@@ -21,3 +21,11 @@ PREDICTORS = {
 if any((Path(__file__).resolve().parent.parent / "models").glob("xgb_h*.json")):
     from .xgb import xgb_predict
     PREDICTORS["xgboost"] = xgb_predict
+
+# Same for the transformer (python train_transformer.py; needs torch).
+if (Path(__file__).resolve().parent.parent / "models" / "transformer.pt").exists():
+    from .transformer import transformer_predict
+    PREDICTORS["transformer"] = transformer_predict
+    if "xgboost" in PREDICTORS:
+        from .ensemble import ensemble_predict
+        PREDICTORS["xgb+transformer"] = ensemble_predict
