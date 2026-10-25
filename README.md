@@ -1,6 +1,8 @@
 PASTE INTO LLM
 take tasks from timeline at bottom, one at a time. tackle bit by bit
 
+python download.py --start "2026-10-18 00:00" --end "2026-10-23 02:00"
+
 
 Here’s the plan. One honest flag first: I couldn’t confirm the size of Wikimedia’s hourly pageview files from here. They’re big, and downloading all-language files for many days could be tens of GB on hackathon wifi. So the data download starts first, small (2 days), and grows overnight.
 
