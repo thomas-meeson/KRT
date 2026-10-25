@@ -4,6 +4,7 @@ To add a model: write predict(history, now, horizon=1) -> pd.Series in its own f
 (see INTERFACES.md section 2), import it here, and add one line to PREDICTORS.
 """
 from .baselines import last_24h_mean, last_hour, same_hour_yesterday
+from .decay_predict import decay_predict
 
 PREDICTORS = {
     "last_hour": last_hour,                       # standard rule, ~ "least recently used"
