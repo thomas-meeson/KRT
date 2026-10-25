@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Ahead of the Spike · Wikipedia cache replay</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="foresight.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to replay</a>
+  <header class="masthead"><a class="wordmark" href="./">AHEAD OF THE SPIKE<span class="brand-dot" aria-hidden="true"></span></a><span class="edition">OXHACK / DESIGN ENGINEERING</span></header>
+  <main id="main">
+    <div class="provenance" id="provenance">DEVELOPMENT DATA / UNVERIFIED</div>
+    <section class="intro" aria-labelledby="title"><div><p class="eyebrow">WIKIPEDIA · ATTENTION &amp; ANTICIPATION</p><h1 id="title">Attention moves.<br>Can the cache keep up?</h1></div><p class="intro-copy">Memory is limited. Every hour, a cache chooses which articles to hold. Explore how those choices meet the next wave of attention.</p></section>
+    <div id="status" class="status" role="status" aria-live="polite">Loading the supplied replay dataset…</div>
+    <button id="retry" type="button" hidden>Try loading again</button>
+    <div id="replay" hidden>
+      <section class="replay-heading" aria-labelledby="snapshot-title"><div><p class="eyebrow">01 / REPLAY THE DAY</p><h2 id="snapshot-title">Wikipedia, one hour at a time.</h2></div><div class="timestamp"><time id="hour"></time><span id="interval"></span></div></section>
+      <section class="transport" aria-label="Replay controls">
+        <div class="transport-buttons">
+          <button id="previous" type="button" class="secondary" aria-label="Previous available hour">← Previous</button>
+          <button id="play" type="button">Play</button>
+          <button id="next" type="button" class="secondary" aria-label="Next available hour">Next →</button>
+        </div>
+        <div class="timeline-control">
+          <div class="timeline-heading"><label for="timeline">Selected hour</label><span id="playback-state"></span></div>
+          <input id="timeline" type="range" min="0" max="0" step="1" value="0" aria-describedby="coverage">
+          <div class="timeline-ends"><span id="timeline-start"></span><span id="timeline-end"></span></div>
+        </div>
+        <p id="coverage" class="coverage"></p>
+        <p id="replay-announcement" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
+      </section>
+      <dl class="context"><div><dt>Reported cache capacity</dt><dd id="capacity"></dd></div><div><dt>Views in this hour</dt><dd id="total"></dd></div><div><dt>Available replay hours</dt><dd id="hour-count"></dd></div></dl>
+      <div class="performance" id="performance" aria-label="Supplied hourly cache hit rates"></div>
+      <p class="metric-note">Hit rate = cached article views ÷ all views in the supplied hour. These are supplied values, not calculations from the leaderboard.</p>
+      <section class="leaderboard" aria-labelledby="leaderboard-title"><div class="section-heading"><div><p class="eyebrow">02 / WHERE ATTENTION LANDED</p><h2 id="leaderboard-title">The most-read articles</h2></div><p id="page-count"></p></div><p class="table-hint" id="table-hint">Cache decisions: ✓ Cached · × Missed · — Unavailable. Scroll horizontally on smaller screens.</p><div class="table-scroll" role="region" aria-label="Article leaderboard" aria-describedby="table-hint" tabindex="0"><table><caption class="sr-only">Article views and cache status for each supplied model at the selected hour</caption><thead id="table-head"></thead><tbody id="table-body"></tbody></table></div></section>
+      <section class="foresight" aria-labelledby="foresight-title">
+        <div class="section-heading">
+          <div><p class="eyebrow">03 / THE COST OF LOOKING AHEAD</p><h2 id="foresight-title">What is foresight worth?</h2></div>
+          <span id="foresight-origin" class="chart-origin"></span>
+        </div>
+        <p class="foresight-intro">How does cache hit rate change when articles must be chosen further ahead? Compare the supplied results at each forecast horizon.</p>
+        <p id="foresight-status" class="metric-note"></p>
+        <ul id="foresight-legend" class="chart-legend" aria-label="Chart series"></ul>
+        <div class="chart-scroll" role="region" aria-label="Foresight chart" tabindex="0">
+          <svg id="foresight-chart" viewBox="0 0 760 340" role="img" aria-labelledby="foresight-chart-title"></svg>
+        </div>
+        <div class="foresight-values" role="region" aria-label="Foresight values" tabindex="0">
+          <table><caption>Supplied hit rates by forecast horizon</caption><thead id="foresight-head"></thead><tbody id="foresight-body"></tbody></table>
+        </div>
+        <p class="metric-note">Lines connect supplied points only. No intermediate forecasts or confidence intervals are inferred. Synthetic or unverified results do not establish a performance advantage.</p>
+      </section>
+    </div>
+    <aside class="limits" aria-labelledby="limits-title"><p class="eyebrow">READ THE RESULTS HONESTLY</p><h2 id="limits-title">A useful model. A simplified world.</h2><div class="limit-grid"><p><strong>Hourly decisions</strong>Cache choices happen once an hour, rather than for every request.</p><p><strong>Equal page sizes</strong>Every article occupies one slot; actual byte sizes are not modelled.</p><p><strong>Sudden shocks</strong>Hourly history cannot reliably anticipate a first-hour surge with no prior signal.</p></div><p class="development-note">Development preview: explore the supplied hours with the replay controls. Story charts are planned for later increments. Synthetic or unverified values are not evidence of model performance.</p></aside>
+  </main><footer><span>AHEAD OF THE SPIKE</span><span>English Wikipedia · all times UTC</span></footer>
+</body>
+</html>
+
+
