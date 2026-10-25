@@ -15,6 +15,7 @@
   <script src="storage.js" defer></script>
   <script src="replay-data.js" defer></script>
   <script src="lookup.js" defer></script>
+  <script src="desk.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -26,7 +27,7 @@
   </header>
   <div class="article-layout">
     <aside id="article-sidebar" class="article-sidebar" aria-label="Project navigation">
-      <nav class="journey-nav" aria-label="Project pages"><strong>Explore the project</strong><a href="#start" data-go="start" aria-current="page">Introduction</a><a href="#explore" data-go="explore">Explore a day</a><a href="#results" data-go="results">Results</a><a href="#storage" data-go="storage">Storage comparison</a></nav>
+      <nav class="journey-nav" aria-label="Project pages"><strong>Explore the project</strong><a href="#start" data-go="start" aria-current="page">Introduction</a><a href="#explore" data-go="explore">Explore a day</a><a href="#results" data-go="results">Results</a><a href="#storage" data-go="storage">Storage comparison</a><a href="#desk" data-go="desk">Live cache desk</a></nav>
       <nav class="article-contents" aria-label="On this page"><strong>On this page</strong><ul id="section-links"></ul></nav>
     </aside>
     <main id="main">
@@ -118,7 +119,65 @@
         <p class="metric-note">Both capacities stay visible. Switch the method to see its measured results at each size. Each filled block represents space for 10,000 articles; the bars measure views served on a 0–100% scale.</p><div id="storage-comparison" class="storage-grid"></div>
         <div id="storage-answer" class="storage-answer" aria-live="polite"></div>
         <details class="learn-more"><summary>How to read this comparison</summary><div class="details-content"><p>The filled blocks show relative article capacity. Each block stands for 10,000 article spaces. The bars show recorded views served from fast storage on a scale from zero to 100 percent.</p><p>Values per 1,000 are rounded illustrations of the average hit rates. Both sizes use the same 72 hours at a one hour planning time. A page view is counted in the retained top 150,000 English Wikipedia articles for that hour.</p><p>Each article counts as one space. This is not a comparison of storage in bytes, hardware price or financial savings. Bigger storage helped in this test; it does not establish the best cost tradeoff.</p><a href="../out/results.csv" download>Download the measured results</a></div></details>
-        <div class="page-end"><a class="button" href="#results" data-go="results">Back to the forecasting question</a><a class="back-link" href="#start" data-go="start">Start from the beginning</a></div>
+        <div class="page-end"><a class="button" href="#results" data-go="results">Back to the forecasting question</a><a class="back-link" href="#desk" data-go="desk">Open the live cache desk →</a></div>
+      </section>
+      <section class="journey-view" data-view="desk" hidden aria-labelledby="desk-title">
+        <div class="view-intro"><p class="eyebrow">REPLAY OF RECORDED DATA · NOT LIVE WIKIPEDIA TRAFFIC</p><h1 id="desk-title" tabindex="-1">Live cache desk</h1><p>The 72 held-out test hours, streamed one hour at a time as if the cache were running live. Every number is a published backtest result; nothing is simulated or recomputed here.</p></div>
+        <p id="desk-status" class="status" role="status" hidden></p>
+        <div id="desk-body">
+        <section class="horizon-lab desk-controls" aria-label="Choose the cache to inspect">
+          <fieldset class="horizon-picker"><legend>Cache capacity</legend><label><input type="radio" name="desk-capacity" value="1000"><span>1,000</span></label><label><input type="radio" name="desk-capacity" value="10000"><span>10,000</span></label><label><input type="radio" name="desk-capacity" value="100000" checked><span>100,000</span></label></fieldset>
+          <fieldset class="horizon-picker"><legend>Decided how many hours ahead?</legend><label><input type="radio" name="desk-horizon" value="1" checked><span>1 hour</span></label><label><input type="radio" name="desk-horizon" value="2"><span>2 hours</span></label><label><input type="radio" name="desk-horizon" value="3"><span>3 hours</span></label><label><input type="radio" name="desk-horizon" value="6"><span>6 hours</span></label></fieldset>
+        </section>
+
+        <section class="desk-section" aria-labelledby="desk-tape-title">
+          <h2 id="desk-tape-title">The decision tape</h2><p class="section-copy">Each tick is one evaluated hour. All three caches were filled before that hour using only earlier views, then scored against what readers actually requested.</p>
+          <div class="replay-toolbar"><div class="timestamp"><time id="desk-hour"></time><span id="desk-position"></span></div><span class="scope-chip" id="desk-scope"></span></div>
+          <section class="transport" aria-label="Desk replay controls">
+            <div class="transport-buttons"><button id="desk-previous" type="button" class="secondary">← Previous</button><button id="desk-play" type="button">Play</button><button id="desk-next" type="button" class="secondary">Next →</button></div>
+            <div class="timeline-control"><div class="timeline-heading"><label for="desk-timeline">Move through the test hours</label><span id="desk-state"></span></div><input id="desk-timeline" type="range" min="0" max="0" step="1" value="0"><div class="timeline-ends"><span id="desk-start"></span><span id="desk-end"></span></div></div>
+          </section>
+          <div class="performance desk-counters" id="desk-counters" aria-live="polite"></div>
+          <dl class="summary-grid desk-running" id="desk-running"></dl>
+          <ol class="desk-log" id="desk-log" aria-label="Most recent hours first"></ol>
+        </section>
+
+        <section class="desk-section" aria-labelledby="desk-edge-title">
+          <h2 id="desk-edge-title">Where does the edge come from?</h2>
+          <div id="desk-edge"></div>
+        </section>
+
+        <section class="desk-section" aria-labelledby="desk-regret-title">
+          <h2 id="desk-regret-title">Regret against perfect hindsight</h2><p class="section-copy">Regret is the share of views a method failed to serve that perfect hindsight would have served. Lower is better. Perfect hindsight is a ceiling, not a usable method.</p>
+          <div class="horizon-scores explorer-scores" id="desk-regret-cards"></div>
+          <ul id="desk-regret-legend" class="chart-legend" aria-label="Regret chart series"></ul>
+          <div class="chart-scroll" role="region" aria-label="Hourly regret chart; scroll sideways on small screens" tabindex="0"><svg id="desk-regret" viewBox="0 0 760 300" role="img" aria-labelledby="desk-regret-chart-title"></svg></div>
+        </section>
+
+        <section class="desk-section" aria-labelledby="desk-real-title">
+          <h2 id="desk-real-title">Is the edge real?</h2><p class="section-copy">Paired, hour by hour, on the same held-out hours. Intervals are 95% block-bootstrap intervals; the sign test asks how surprising the win count would be if neither method were better.</p>
+          <dl class="summary-grid" id="desk-significance"></dl>
+          <h3 class="desk-subhead">Distribution of hourly gains</h3>
+          <div class="chart-scroll" role="region" aria-label="Histogram of hourly gains; scroll sideways on small screens" tabindex="0"><svg id="desk-hist" viewBox="0 0 760 260" role="img" aria-labelledby="desk-hist-title"></svg></div>
+          <p id="desk-hist-note" class="metric-note"></p>
+        </section>
+
+        <section class="desk-section" aria-labelledby="desk-struggle-title">
+          <h2 id="desk-struggle-title">Where it struggles</h2><p class="section-copy">Every published configuration side by side. Small caches leave little room to improve, and the model does not beat the rule everywhere.</p>
+          <div class="foresight-values" role="region" aria-label="All configurations" tabindex="0"><table><caption>XGBoost against the standard rule for every capacity and horizon (value_metrics.csv)</caption><thead><tr><th scope="col">Capacity</th><th scope="col">Ahead</th><th scope="col">Fewer misses</th><th scope="col">Hours won</th><th scope="col">Sign test p</th><th scope="col">Spike views served (model / rule)</th><th scope="col">Spike catch lag (model / rule)</th></tr></thead><tbody id="desk-configs"></tbody></table></div>
+        </section>
+
+        <section class="desk-section" aria-labelledby="desk-method-title">
+          <h2 id="desk-method-title">How the backtest works</h2>
+          <ol class="lesson-steps desk-method">
+            <li><span class="lesson-number">01</span><h3>No look-ahead</h3><p>A predictor only ever receives rows with hour ≤ now. Training uses only hours before the 3-day test period.</p></li>
+            <li><span class="lesson-number">02</span><h3>Same budget</h3><p>Every method caches its top N predicted pages, with the same N and the same planning horizon h.</p></li>
+            <li><span class="lesson-number">03</span><h3>Exact scoring</h3><p>Hit rate is the share of actual views at hour now + h that land in the cache. A cache does not change what people read, so replaying history is an exact backtest of this hourly model.</p></li>
+          </ol>
+          <p class="metric-note">Limits: hourly rather than per-request decisions, every page counts as one slot, about five days of data, bots flagged but not removed. Denominator: the retained top 150,000 English Wikipedia pages per hour.</p>
+        </section>
+        </div>
+        <div class="page-end"><a class="back-link" href="#storage" data-go="storage">← Storage comparison</a><a class="button" href="#start" data-go="start">Start from the beginning</a></div>
       </section>
     </div>
   </main>

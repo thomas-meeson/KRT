@@ -1,6 +1,6 @@
 'use strict';
 
-const viewTitles = { start: 'start-title', explore: 'snapshot-title', results: 'results-title', storage: 'storage-title' };
+const viewTitles = { start: 'start-title', explore: 'snapshot-title', results: 'results-title', storage: 'storage-title', desk: 'desk-title' };
 const legacyViews = { 'summary-title': 'results', 'snapshot-title': 'explore', 'spike-title': 'results', 'foresight-title': 'results', 'limits-title': 'results' };
 
 function requestedView() {
@@ -12,6 +12,7 @@ function showView(view, { focus = true, updateUrl = true } = {}) {
   if (!Object.hasOwn(viewTitles, view)) view = 'start';
   if (view !== 'start' && !replay) return;
   pause();
+  pauseDesk();
   document.querySelectorAll('[data-view]').forEach(section => { section.hidden = section.dataset.view !== view; });
   document.querySelectorAll('.journey-nav [data-go]').forEach(link => {
     if (link.dataset.go === view || (view === 'storage' && link.dataset.go === 'results')) link.setAttribute('aria-current', 'page');

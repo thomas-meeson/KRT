@@ -448,3 +448,29 @@ button.hour-link { padding:0; min-height:0; font-weight:400; }
 #search-results .search-article:hover, #search-results .search-article:focus-visible { text-decoration:underline; }
 @media(max-width:800px) { .explorer-scores, .storage-grid.three-sizes { grid-template-columns:1fr; } }
 @media(max-width:600px) { .article-lookup { padding:16px; } .replay-capacity span { padding:8px 10px; } }
+
+/* Live cache desk: built from the existing replay, summary and table styles. */
+.desk-controls { display:grid; gap:18px; }
+.desk-section { padding-top:30px; border-top:1px solid var(--line); margin-top:32px; }
+.desk-subhead { margin:24px 0 8px; font-size:16px; }
+.desk-counters { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.desk-counters .desk-xgboost .rate { color:#36c; }
+.desk-counters .desk-xgboost .meter-fill { background:#36c; }
+.desk-counters .desk-oracle .rate { color:#54595d; }
+.desk-counters .desk-oracle .meter-fill { background:#a2a9b1; }
+.desk-counters .model:nth-child(even) .rate { color:#36c; }
+.desk-running dd { font-size:22px; font-variant-numeric:tabular-nums; }
+.desk-log { list-style:none; margin:8px 0 0; padding:0; border-top:1px solid var(--line); font-size:13px; font-variant-numeric:tabular-nums; }
+.desk-log li { display:grid; grid-template-columns:minmax(150px,auto) 1fr auto; gap:16px; padding:9px 4px; border-bottom:1px solid #eaecf0; }
+.desk-log li:first-child { background:#eaf3ff; font-weight:600; }
+.desk-log time { color:var(--muted); }
+.desk-win { color:#14866d; }
+.desk-loss { color:#b32424; }
+#desk-regret, #desk-hist { width:100%; min-width:620px; height:auto; display:block; }
+#desk-regret text, #desk-hist text { font:12px Arial, sans-serif; fill:#54595d; }
+#desk-configs tr { cursor:pointer; }
+#desk-configs tr.desk-current { background:#eaf3ff; }
+#desk-configs td.desk-loss { font-weight:600; }
+.desk-method { margin-top:12px; }
+.desk-method h3 { font-size:15px; margin:6px 0; }
+@media(max-width:800px) { .desk-counters { grid-template-columns:1fr; } .desk-log li { grid-template-columns:1fr auto; } .desk-log li span { grid-column:1 / -1; } }

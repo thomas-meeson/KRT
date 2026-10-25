@@ -228,6 +228,7 @@ async function load() {
     refreshExplorer();
     renderStorageComparison(data);
     loadStorageExtras();
+    initDesk();
     initializeSpikes(data);
     render();
     showView(requestedView(), { focus: false, updateUrl: true });

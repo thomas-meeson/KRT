@@ -21,6 +21,10 @@ Decision explorer and article lookup (used by the website in demo/):
     GET /api/pages?q=tom       {pages: [...]} titles present in demo.json (maximum 50)
     GET /api/page/{title}      {page, day, cache_size, horizon, our_model_name, observations[24], spikes}
         spaces/underscores and case are normalised; unknown titles return 404.
+    GET /api/tape              {day, cache_size, horizon, predictors, our_model_name, hours: [{hour, hit_rate,
+        total_views, rows, missed, disagreements: [{page, views, cached}], edge_views}]}
+        top-50 rows where the methods' demo.json cache choices differ (Live cache desk);
+        edge_views = views of those rows only our model had cached minus those only the rule had.
 Static files:
     GET /demo/                 the website (published-data demo, enhanced when this API is present)
     GET /demo.json, /out/...   the exact published files the website verifies by SHA-256
@@ -219,6 +223,28 @@ def page(title: str):
                                         for m in d['predictors']}})
     return {'page': title, 'day': d['day'], 'cache_size': d['cache_size'], 'horizon': 1,
             'our_model_name': d.get('our_model_name'), 'observations': observations, 'spikes': spikes}
+
+
+@app.get('/api/tape')
+def tape():
+    """Replay hours with the top-50 rows where the two methods' cache choices differ."""
+    d = demo()
+    keys = d['predictors']
+    hours = []
+    for h in sorted(d['hours'], key=lambda item: item['hour']):
+        rows = [p for p in h.get('top_pages', []) if isinstance(p.get('cached'), dict)
+                and all(isinstance(p['cached'].get(k), bool) for k in keys)]
+        split = sorted((p for p in rows if len({p['cached'][k] for k in keys}) > 1),
+                       key=lambda p: -p['views'])
+        edge = None
+        if {'last_hour', 'our_model'} <= set(keys):
+            edge = sum(p['views'] if p['cached']['our_model'] else -p['views'] for p in split)
+        hours.append({'hour': h['hour'], 'hit_rate': h.get('hit_rate'), 'total_views': h.get('total_views'),
+                      'rows': len(rows), 'missed': {k: sum(not p['cached'][k] for p in rows) for k in keys},
+                      'disagreements': [{'page': p['page'], 'views': p['views'], 'cached': p['cached']} for p in split],
+                      'edge_views': edge})
+    return {'day': d['day'], 'cache_size': d['cache_size'], 'horizon': 1, 'predictors': keys,
+            'our_model_name': d.get('our_model_name'), 'hours': hours}
 
 
 @app.get('/', include_in_schema=False)

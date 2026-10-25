@@ -88,6 +88,24 @@ def test_page_lookup(client, title):
             assert o['source'] is None and all(v is None for v in o['cached'].values())
 
 
+def test_tape(client):
+    d = client.get('/api/tape').json()
+    assert d['cache_size'] == 10000 and len(d['hours']) == 24
+    assert [h['hour'] for h in d['hours']] == sorted(h['hour'] for h in d['hours'])
+    replay = {h['hour']: h for h in client.get('/api/demo').json()['hours']}
+    total_split = 0
+    for hour in d['hours']:
+        rows = {p['page']: p for p in replay[hour['hour']]['top_pages']}
+        assert hour['hit_rate'] == replay[hour['hour']]['hit_rate']
+        for split in hour['disagreements']:
+            assert split['cached']['last_hour'] != split['cached']['our_model']
+            assert rows[split['page']]['views'] == split['views']
+        assert hour['edge_views'] == sum(s['views'] if s['cached']['our_model'] else -s['views']
+                                         for s in hour['disagreements'])
+        total_split += len(hour['disagreements'])
+    assert total_split > 0
+
+
 def test_page_unknown(client):
     r = client.get('/api/page/Definitely_Not_A_Recorded_Article')
     assert r.status_code == 404
