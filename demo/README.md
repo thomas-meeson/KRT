@@ -1,93 +1,95 @@
-# Ahead of the Spike — frontend foundation
+# Ahead of the Spike frontend
 
-Plain HTML, CSS and JavaScript; no packages or build step.
-
-From the repository root, run:
+Plain HTML, CSS and JavaScript. No packages or build step. From repository root:
 
 ```powershell
 python -m http.server 8000 --bind 127.0.0.1
 ```
 
-Open http://127.0.0.1:8000/demo/ in your browser. Serve the repository root,
-not only this directory: the page fetches `../out/demo.json`. Opening the HTML
-directly as a file does not reliably allow fetch.
+Open http://127.0.0.1:8000/demo/#start. Serve the root, not only demo/.
 
-The replay starts paused at the earliest valid hour of the supplied replay day.
-Play advances one available record every two seconds and stops at the final
-record. Replay day restarts from the beginning. Previous/Next and the native
-range slider pause playback and update the timestamp, hit rates and leaderboard
-together. Focus the slider and use arrow keys, Home or End to navigate.
+## Visitor journey
 
-The timeline represents available records, not continuous elapsed time. Missing
-hours are explicitly noted and skipped without inventing intermediate data.
-Single-hour datasets disable navigation. Playback pauses when the page becomes
-hidden and does not resume automatically. Reduced-motion users get the same
-instant updates, with no decorative transitions or autoplay.
+Start here explains the problem. Explore a day shows hourly article demand and
+100,000 space performance. What we found presents 100,000 space aggregate
+results. The optional storage page compares 10,000 with 100,000 spaces while
+holding the approach and one hour planning time fixed.
 
-The foresight chart reads `summary.foresight_curve` once per dataset load and
-does not change with the replay hour. Horizons 1, 2, 3 and 6 use proportional
-horizontal spacing and a fixed 0–100% vertical scale. Exact values are available
-in the visible table. Line styles and point shapes supplement colour.
-Missing/invalid values break lines; ambiguous array lengths invalidate the
-affected series. Duplicate or unsupported horizon definitions are rejected for
-the chart without blocking the replay. No results are recomputed.
+Navigation pauses playback, supports browser history and moves keyboard focus.
+The replay starts paused, advances every two seconds and stops at the end.
+Manual navigation pauses. The slider supports arrows, Home and End. The article
+list starts with six rows and can expand to the supplied 50. Technical details
+are expandable. Reset returns to the start and closes all details.
 
-The repository's updated `INTERFACES.md` is the contract used for this increment.
-`our_model`
-remains a lookup key; `our_model_name`, when non-empty, is used for display in
-metrics, the leaderboard and chart. Older fixtures lacking it retain their key
-as a label. Inspection of the updated `backtest.py` confirms that
-`summary.oracle_hit_rate` is the horizon-1 ceiling at the replay cache size;
-it is not plotted as a multi-horizon curve.
-The presentation summary displays this scalar alongside the supplied
-`summary.hit_rate` values and labels all of them as test-period, horizon-1
-results, distinct from the selected hourly replay. Missing/invalid oracle
-values stay Unavailable. The oracle uses future observations and is not a
-deployable predictor.
+## Explore data sources
 
-The five story links pause playback and navigate with keyboard focus to the
-comparison, replay, spike story, foresight and limitations. Reset walkthrough
-pauses playback and returns to the first available replay hour and summary.
-See `PITCH.md` for rehearsal and `PROGRESS.md` for remaining handoffs.
+Root demo.json still declares 10,000 spaces. Its recorded article demand is
+independent of capacity. replay-data.js retains the supplied hour, total_views,
+article names and view counts, then reads the already-scored hourly.csv rows
+where cache_size is 100000 and horizon is 1. our_model maps to our_model_name.
+Only exact matching UTC target hours and valid rates are displayed.
 
-The spike selector uses supplied records only. View counts and reported catch
-lags appear in a trajectory, separate catch-time lanes, numerical readouts and
-an expandable values table. The event button pauses and jumps the main replay
-to the exact onset if that hour is available, then moves focus to the timeline.
-Selecting an event itself does not change replay state.
+The CSV is the exact text already checked by provenance.js, avoiding a second
+fetch that could mix result versions. Missing, invalid, duplicate or unconfirmed
+hourly results stay unavailable. The frontend never calculates cache membership
+or hit rates from demand, never reruns a predictor, and never substitutes 10k
+rates for missing 100k rates.
 
-Malformed records (invalid timestamps, duplicate hours, missing onset or
-misaligned views arrays) are omitted with a count. Invalid observations and zero
-values break the trajectory: the contract uses zero for missing/out-of-range
-data, so exact zero traffic cannot be established. Nonconsecutive timestamps
-also break lines. The values table retains zero as a supplied, uncertain count.
-Lag 0 means at arrival; lag 24 is capped, never an exact catch marker or an input
-to an earlier-response claim. Invalid lags show Unavailable. Exact catch markers
-outside the trajectory window are described without extending the view data.
-Records below the 1,000-view onset minimum are flagged; relative-response claims
-are withheld. The 24-hour median criterion cannot be checked from the short
-window, so event classification remains supplied, not frontend-verified.
+Individual article readiness for 100k has not been supplied. Explore therefore
+shows demand without the 10k cache tags, with an explicit explanation. If
+Computing later supplies a native 100k demo.json, its matching per-article
+statuses can be displayed after provenance is reviewed. The optional surge chart shows recorded article demand only. No 10k catch times or cache markers are presented as part of the main story.
 
-Model selection is a later increment.
+## Results and provenance
 
-`_fake: true` is recognised as synthetic. Its absence or false value is **not**
-proof of real data: the page defaults to DEVELOPMENT DATA / UNVERIFIED. A verified
-provenance handoff must be agreed before publishing measured-result claims.
-No JSON schema extensions are required by this frontend.
+run-metadata.json contains capacity profiles copied from results.csv and paired
+findings copied from the published key_numbers reports. Main results and the
+foresight curve use the 100k profile. The storage page uses both 10k and 100k.
+No new experiment or statistical test runs in the frontend. Counts per 1,000
+are rounded illustrations of supplied average hit rates.
 
-The current synthetic generator is only a UI fixture: simulated model caches
-can differ in size, the reported capacity does not describe its simulation,
-and some supplied spikes do not meet the agreed definition. Do not use its
-values to establish performance or event claims.
+The user confirmed Computing's final run. SHA-256 checks bind confirmation to
+demo.json, results.csv, hourly.csv and both key_numbers reports. CRLF is
+normalised to LF for Git portability. Missing or changed files revert to
+unverified and suppress result profiles. Synthetic input always says synthetic.
+Hashing requires localhost or HTTPS. Updating a run requires reviewing scope,
+file digests and published statistics together; do not reuse old intervals.
 
-Validation covers fields used in this increment. Invalid required replay
-structure produces an error; invalid optional metrics display Unavailable.
-Malformed article rows are omitted with an explicit warning. Unknown cache
-decisions are not treated as misses. UTC timestamps must be exact hour starts;
-duplicate hours are rejected. Article names are inserted with textContent.
-The leaderboard does not recalculate hit rates or claim to list cache contents.
+The denominator is retained top 150,000 English Wikipedia pages per hour,
+not all Wikipedia traffic. Test targets span 20 October 03:00 to 23 October
+02:00 UTC; replay day is 22 October 2026. Horizon counts 1/2/3/6 are 72/71/70/67.
+Oracle is perfect hindsight at horizon 1, not a deployable predictor.
 
-Checks for this increment: source syntax; supplied-data rendering; renamed model
-identifiers; missing, invalid and empty data; HTML-like article names; mobile
-overflow; keyboard focus and readable provenance. No teammate-owned data is
-modified by the frontend.
+## Editable interpretation
+
+Event causes are optional, separate in event-context.json. Each exact page key
+needs status checked, text and an HTTPS source_url to display. Text uses safe
+DOM rendering. Missing or invalid editorial context does not block the demo.
+Never infer a news cause from a title alone. Interpretation does not alter the
+measurements or their confirmation.
+
+See PITCH.md for rehearsal and PROGRESS.md for the remaining handoffs.
+
+
+## How to explain the comparison
+
+The public labels are Standard rule and Our model (XGBoost). Standard rule
+corresponds to last_hour, a persistence baseline. Our model maps to the supplied
+our_model_name. Actual article views are observations. Cache hit rates are
+measured historical outcomes, not predicted view counts or forecast accuracy.
+
+Start explains the two methods, then the sequence: past data, cache choice,
+evaluation against later actual views. Explore shows the latest permitted
+history hour and selected target hour. Both methods choose one hour ahead there.
+The selected-hour gap is presentation arithmetic on the published rates.
+
+Results distinguishes average hourly hit rates from one replay hour. Both
+methods are evaluated at the same horizon. Six hours ahead means both commit
+six hours before the target, not that the model detected a spike six hours early.
+The 1h and 6h panels show both methods' actual outcomes as well as the published
+paired differences. The standard rule is allowed to operate at either horizon.
+
+Surge plots now show actual views only. The old 10k catch lanes and comparisons
+are removed from the rendered interface to avoid mixing scopes. No per-article
+forecast values or early-prediction evidence have been supplied. These remain
+possible later handoffs rather than claims the UI currently makes.

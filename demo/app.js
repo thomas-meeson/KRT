@@ -1,14 +1,15 @@
 'use strict';
 
 // Consume teammate-owned output. Never infer performance from the top-50 sample.
-const SOURCE = '../out/demo.json';
+const SOURCE = '../demo.json';
 const FRAME_MS = 2000;
 let replay = null;
 let selectedIndex = 0;
 let playbackTimer = null;
+let showAllPages = false;
 const element = id => document.getElementById(id);
 const number = new Intl.NumberFormat('en-GB');
-const percent = new Intl.NumberFormat('en-GB', { style: 'percent', maximumFractionDigits: 1 });
+const percent = new Intl.NumberFormat('en-GB', { style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const dateTime = new Intl.DateTimeFormat('en-GB', {
   timeZone: 'UTC', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
 });
@@ -41,15 +42,21 @@ function render() {
   const hour = hours[selectedIndex];
   const warnings = [];
   if (omitted) warnings.push(`${omitted} invalid or out-of-day hour(s) omitted.`);
-  element('provenance').textContent = data._fake === true ? 'DEMO DATA / SYNTHETIC' : 'DEVELOPMENT DATA / UNVERIFIED';
+  element('provenance').textContent = provenanceLabel(data);
   element('hour').dateTime = hour.hour;
   element('hour').textContent = `${dateTime.format(new Date(hour.hour))} UTC`;
-  element('interval').textContent = `${hour.hour.slice(11, 16)}–${hour.hour.slice(11, 13)}:59 UTC · hour ${selectedIndex + 1} of ${hours.length} available`;
+  element('interval').textContent = `${hour.hour.slice(11, 16)} to ${hour.hour.slice(11, 13)}:59 UTC. Hour ${selectedIndex + 1} of ${hours.length} available.`;
+  element('history-cutoff').textContent = `History through the hour starting ${dateTime.format(new Date(Date.parse(hour.hour) - 3600000))} UTC.`;
+  element('observed-window').textContent = `Recorded views in the hour starting ${dateTime.format(new Date(hour.hour))} UTC.`;
   updateControls();
-  element('capacity').textContent = isCount(data.cache_size) && data.cache_size > 0 ? `${number.format(data.cache_size)} articles` : 'Unavailable';
+  element('capacity').textContent = `Space for ${number.format(replay.capacity)} articles`;
+  element('table-hint').textContent = replay.hasCacheChoices
+    ? '✓ Ready means already in fast storage. × Not ready means the main server would be needed.'
+    : 'This list shows what people read. Individual article readiness is not included in the published 100,000 space results.';
+  document.querySelector('.table-scroll').classList.toggle('demand-only', !replay.hasCacheChoices);
   element('total').textContent = isCount(hour.total_views) ? number.format(hour.total_views) : 'Unavailable';
   element('hour-count').textContent = `${hours.length} / 24`;
-  if (!isCount(data.cache_size) || data.cache_size === 0 || !isCount(hour.total_views)) warnings.push('Some context values are unavailable.');
+  if (!isCount(hour.total_views)) warnings.push('Some context values are unavailable.');
   const models = element('performance');
   models.replaceChildren();
   for (const name of data.predictors) {
@@ -57,7 +64,7 @@ function render() {
     const valid = isRate(value);
     const card = node('section', undefined, 'model');
     const label = node('h3', modelLabel(data, name), 'model-label');
-    label.append(node('span', name === 'last_hour' ? 'Previous-hour baseline · supplied hit rate' : 'Comparison model · supplied hit rate'));
+    label.append(node('span', name === 'last_hour' ? 'Rank using the latest observed hour' : 'Forecast demand from earlier page views'));
     const rate = node('p', valid ? percent.format(value) : 'Unavailable', `rate${valid ? '' : ' unavailable'}`);
     card.append(label, rate);
     if (valid) {
@@ -67,11 +74,16 @@ function render() {
       fill.style.width = `${value * 100}%`;
       meter.append(fill);
       card.append(meter);
-    } else warnings.push(`Hit rate unavailable for ${name}.`);
+    } else warnings.push(`Result unavailable for ${modelLabel(data, name)}.`);
     models.append(card);
   }
   const heading = node('tr');
-  for (const [title, className] of [['#', ''], ['Article', ''], ['Views', 'views'], ...data.predictors.map(name => [modelLabel(data, name), 'cache'])]) {
+  const standardRate = hour.hit_rate?.last_hour;
+  const modelRate = hour.hit_rate?.our_model;
+  element('hourly-gap').textContent = isRate(standardRate) && isRate(modelRate)
+    ? `For this hour, our model’s cache would serve ${Math.abs((modelRate - standardRate) * 100).toFixed(2)} percentage points ${modelRate >= standardRate ? 'more' : 'fewer'} recorded views than the standard rule.`
+    : 'The result difference is unavailable for this hour.';
+  for (const [title, className] of [['#', ''], ['Article', ''], ['Views', 'views'], ...(replay.hasCacheChoices ? data.predictors.map(name => [modelLabel(data, name), 'cache']) : [])]) {
     const cell = node('th', title, className);
     cell.scope = 'col';
     heading.append(cell);
@@ -82,21 +94,26 @@ function render() {
   const invalidPages = suppliedPages.length - pages.length;
   if (invalidPages) warnings.push(`${invalidPages} invalid article row(s) omitted.`);
   pages.sort((a, b) => b.views - a.views);
-  element('page-count').textContent = `${pages.length} supplied articles · ordered by views`;
+  const visiblePages = showAllPages ? pages : pages.slice(0, 6);
+  element('page-count').textContent = `Showing ${visiblePages.length} of ${pages.length} recorded articles, most read first.`;
+  element('show-pages').hidden = pages.length <= 6;
+  element('show-pages').textContent = showAllPages ? 'Show fewer' : `Show all ${pages.length}`;
+  element('show-pages').setAttribute('aria-expanded', String(showAllPages));
   const body = element('table-body');
   body.replaceChildren();
   let unknownCache = false;
-  pages.forEach((page, index) => {
+  visiblePages.forEach((page, index) => {
     const row = node('tr');
-    const title = node('th', page.page.replaceAll('_', ' '));
+    const title = node('th');
+    title.append(node('span', page.page.replaceAll('_', ' '), 'article-title'), node('span', `${number.format(page.views)} views`, 'article-views-mobile'));
     title.scope = 'row';
     row.append(node('td', String(index + 1).padStart(2, '0'), 'rank'), title, node('td', number.format(page.views), 'views'));
-    for (const name of data.predictors) {
+    for (const name of replay.hasCacheChoices ? data.predictors : []) {
       const cached = page.cached?.[name];
       const known = typeof cached === 'boolean';
       unknownCache ||= !known;
       const cell = node('td', undefined, 'cache');
-      cell.append(node('span', known ? (cached ? '✓ Cached' : '× Missed') : '— Unavailable', `badge${known ? (cached ? '' : ' missed') : ' unknown'}`));
+      cell.append(node('span', known ? (cached ? '✓ Ready' : '× Not ready') : '? Unknown', `badge${known ? (cached ? '' : ' missed') : ' unknown'}`));
       row.append(cell);
     }
     body.append(row);
@@ -105,7 +122,7 @@ function render() {
   if (!pages.length) {
     const row = node('tr');
     const cell = node('td', 'No valid article rows were supplied for this hour.');
-    cell.colSpan = 3 + data.predictors.length;
+    cell.colSpan = 3 + (replay.hasCacheChoices ? data.predictors.length : 0);
     row.append(cell);
     body.append(row);
   }
@@ -170,6 +187,7 @@ function togglePlayback() {
 
 async function load() {
   pause();
+  approvedRun = null;
   replay = null;
   selectedIndex = 0;
   element('replay').hidden = true;
@@ -184,23 +202,33 @@ async function load() {
     const response = await fetch(SOURCE, { cache: 'no-store', signal: controller.signal });
     if (!response.ok) throw new Error(`The replay file could not be loaded (HTTP ${response.status}).`);
     let data;
-    try { data = await response.json(); } catch (error) {
+    const rawReplay = await response.text();
+    try { data = JSON.parse(rawReplay); } catch (error) {
       if (error.name === 'AbortError') throw error;
       throw new Error('The replay file is not valid JSON.');
     }
     replay = { data, ...validate(data) };
-    renderPresentation(data);
-    renderForesight(data);
+    await verifyRun(rawReplay, controller.signal);
+    configureExploreReplay();
+    await loadEventContext(controller.signal);
+    const mainResults = resultDataset(100000, data);
+    renderPresentation(mainResults);
+    renderForesight(mainResults);
+    renderStorageComparison(data);
     initializeSpikes(data);
     render();
+    showView(requestedView(), { focus: false, updateUrl: true });
   } catch (error) {
+    replay = null;
     element('status').className = 'status error';
-    element('status').textContent = `${error.name === 'AbortError' ? 'Loading timed out.' : error.message} Serve the repository over HTTP and check out/demo.json. No substitute results have been generated.`;
+    element('replay').hidden = true;
+    element('status').textContent = `${error.name === 'AbortError' ? 'Loading timed out.' : error.message} Serve the repository over HTTP and check demo.json. No substitute results have been generated.`;
     element('retry').hidden = false;
   } finally { clearTimeout(timeout); }
 }
 
 element('retry').addEventListener('click', load);
+element('show-pages').addEventListener('click', () => { showAllPages = !showAllPages; render(); });
 element('previous').addEventListener('click', () => selectHour(selectedIndex - 1));
 element('next').addEventListener('click', () => selectHour(selectedIndex + 1));
 element('timeline').addEventListener('input', event => selectHour(Number(event.target.value)));

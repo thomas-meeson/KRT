@@ -1,10 +1,19 @@
 'use strict';
 
 let spikeRecords = [];
-let spikeData = null;
+
+let eventContext = {};
+
+async function loadEventContext(signal) {
+  eventContext = {};
+  try {
+    const response = await fetch('event-context.json', { cache: 'no-store', signal });
+    if (response.ok) eventContext = (await response.json()).events || {};
+  } catch (error) { if (error.name === 'AbortError') throw error; }
+}
 
 function initializeSpikes(data) {
-  spikeData = data;
+
   const supplied = Array.isArray(data.spikes) ? data.spikes : [];
   spikeRecords = supplied.filter(record => record && typeof record.page === 'string' && record.page.trim()
     && isHour(record.spike_hour) && record.spike_hour.slice(0, 10) === data.day
@@ -21,11 +30,14 @@ function initializeSpikes(data) {
   });
   select.disabled = spikeRecords.length === 0;
   element('spike-content').hidden = spikeRecords.length === 0;
-  element('spike-origin').textContent = data._fake === true ? 'DEMO DATA / SYNTHETIC' : 'DEVELOPMENT DATA / UNVERIFIED';
+  const mainProfile = resultProfile(100000);
+  element('spike-plain').textContent = mainProfile && data._fake !== true
+    ? `With space for 100,000 articles, both approaches served almost all spike views. The standard rule served ${percent.format(mainProfile.spike_hit_rate.last_hour)} and our model served ${percent.format(mainProfile.spike_hit_rate.our_model)}. These results do not establish that the model predicted a spike before it began.`
+    : 'A sudden surge is called a spike. The recorded curves below show actual article demand, not a forecast.';
   const omitted = supplied.length - spikeRecords.length;
   element('spike-status').textContent = !spikeRecords.length
     ? 'No usable spike records supplied. Replay and foresight results remain available.'
-    : `${spikeRecords.length} supplied event records.${omitted ? ` ${omitted} malformed record(s) omitted.` : ''} Event classification is supplied by Computing; the 24-hour median cannot be verified from this short window.`;
+    : `${spikeRecords.length} recorded article trajectories. View counts are actual observations and do not depend on cache size.${omitted ? ` ${omitted} malformed record(s) omitted.` : ''} Event classification comes from Computing; the prior 24 hour median cannot be verified from this short window.`;
   if (spikeRecords.length) renderSpike(0);
 }
 
@@ -37,36 +49,28 @@ function renderSpike(index) {
   const atSpike = points.find(point => point.time === onset);
   const conforms = isCount(atSpike.views) && atSpike.views >= 1000;
   const warnings = [];
-  if (!conforms) warnings.push('The supplied spike-hour count is unavailable or below the agreed 1,000-view minimum. Earlier-response comparisons are withheld for this record.');
-  if (points.some(point => !isCount(point.views) || point.views === 0)) warnings.push('Zero or invalid counts are shown as gaps: zero may represent missing or out-of-range data.');
+  if (!conforms) warnings.push('The supplied spike-hour count is unavailable or below the agreed 1,000-view minimum. The reported classification should be checked.');
+  if (points.some(point => !isCount(point.views) || point.views === 0)) warnings.push('Zero or invalid counts are shown as gaps: zero may represent missing or outside recorded coverage data.');
   element('spike-warning').textContent = warnings.join(' ');
   element('spike-warning').hidden = !warnings.length;
   element('spike-name').textContent = record.page.replaceAll('_', ' ');
   element('spike-time').textContent = `Supplied onset: ${dateTime.format(new Date(onset))} UTC`;
+  const context = eventContext[record.page];
+  const contextNode = element('spike-context');
+  contextNode.replaceChildren();
+  let source;
+  try { source = new URL(context?.source_url); } catch { /* Optional editorial context. */ }
+  if (context?.status === 'checked' && typeof context.text === 'string' && context.text.trim() && source?.protocol === 'https:') {
+    contextNode.append(document.createTextNode(`Event context (editorial): ${context.text} `));
+    const link = node('a', 'Source');
+    link.href = source.href;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    contextNode.append(link);
+  } else contextNode.textContent = 'Event cause not established here. The plot shows supplied attention counts, without attributing them to a news event.';
   const jumpIndex = replay.hours.findIndex(hour => hour.hour === record.spike_hour);
   element('spike-jump').disabled = jumpIndex < 0;
   element('spike-jump').textContent = jumpIndex < 0 ? 'Event hour unavailable in replay' : 'Show event hour in replay';
-
-  const isLag = lag => Number.isInteger(lag) && lag >= 0 && lag <= 24;
-  const lags = spikeData.predictors.map(key => ({ key, label: modelLabel(spikeData, key), lag: record.catch_lag_h?.[key] }));
-  const cards = element('spike-lags');
-  cards.replaceChildren();
-  lags.forEach(model => {
-    const card = node('div', undefined, 'catch-card');
-    card.append(node('dt', model.label));
-    card.append(node('dd', !isLag(model.lag) ? 'Unavailable' : model.lag === 24 ? '24h / capped' : model.lag === 0 ? 'At spike arrival' : `${model.lag}h after arrival`));
-    cards.append(card);
-  });
-  const baseline = lags.find(model => model.key === 'last_hour');
-  const comparison = lags.find(model => model.key === 'our_model');
-  let description = 'Catch lags are supplied results; 0h means cached at arrival. A 24h value is capped and may mean the page was never caught within the evaluation window.';
-  if (conforms && baseline && comparison && [baseline.lag, comparison.lag].every(lag => isLag(lag) && lag < 24)) {
-    const delta = baseline.lag - comparison.lag;
-    description = delta === 0 ? 'Both methods have the same supplied catch lag.'
-      : `${delta > 0 ? comparison.label : baseline.label} responded ${Math.abs(delta)} hour${Math.abs(delta) === 1 ? '' : 's'} earlier in this supplied record.`;
-    description += ' This does not establish prediction before arrival or general model superiority.';
-  }
-  element('spike-comparison').textContent = description;
 
   const body = element('spike-values');
   body.replaceChildren();
@@ -77,10 +81,10 @@ function renderSpike(index) {
     row.append(label, node('td', !isCount(point.views) ? 'Unavailable' : point.views === 0 ? '0 supplied · observation uncertain' : number.format(point.views)));
     body.append(row);
   });
-  drawSpike(points, onset, lags, isLag);
+  drawSpike(points, onset);
 }
 
-function drawSpike(points, onset, lags, isLag) {
+function drawSpike(points, onset) {
   const svg = element('spike-chart');
   svg.replaceChildren();
   const start = points[0].time;
@@ -90,7 +94,7 @@ function drawSpike(points, onset, lags, isLag) {
   const ceiling = Math.ceil(max / 4) * 4;
   const x = time => 80 + (time - start) / span * 610;
   const y = views => 240 - views / ceiling * 185;
-  const height = 350 + lags.length * 30;
+  const height = 330;
   svg.setAttribute('viewBox', `0 0 760 ${height}`);
   function shape(tag, attrs = {}, text) {
     const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
@@ -98,8 +102,8 @@ function drawSpike(points, onset, lags, isLag) {
     if (text !== undefined) el.textContent = text;
     return el;
   }
-  svg.append(shape('title', { id: 'spike-chart-title' }, 'Supplied article views and reported catch times'),
-    shape('desc', {}, 'The trajectory shows supplied hourly counts. Gaps represent uncertain observations. Separate labelled lanes mark reported catch times within this window. Exact counts and catch lags are available below.'));
+  svg.append(shape('title', { id: 'spike-chart-title' }, 'Actual recorded article views'),
+    shape('desc', {}, 'This chart shows actual hourly views, not model predictions. The dotted line marks the reported surge onset. Gaps represent uncertain observations. Exact counts are available below.'));
   for (const fraction of [0, .5, 1]) {
     svg.append(shape('line', { x1: 80, x2: 690, y1: y(ceiling * fraction), y2: y(ceiling * fraction), stroke: '#ccd2c9' }),
       shape('text', { x: 68, y: y(ceiling * fraction) + 4, 'text-anchor': 'end' }, number.format(ceiling * fraction)));
@@ -123,19 +127,7 @@ function drawSpike(points, onset, lags, isLag) {
   points.filter((point, i) => i === 0 || i === points.length - 1 || point.time === onset || i % Math.ceil(points.length / 6) === 0)
     .forEach(point => svg.append(shape('text', { x: x(point.time), y: 266, 'text-anchor': 'middle' }, point.hour.slice(11, 16))));
   svg.append(shape('text', { x: 385, y: 290, 'text-anchor': 'middle' }, 'UTC · exact dates in the values table'));
-  lags.forEach((model, i) => {
-    const laneY = 330 + i * 30;
-    const catchTime = onset + model.lag * 3600000;
-    const color = i % 2 ? '#146348' : '#172a29';
-    const label = model.label.length > 28 ? `${model.label.slice(0, 27)}…` : model.label;
-    svg.append(shape('text', { x: 80, y: laneY - 10 }, label),
-      shape('line', { x1: 80, x2: 690, y1: laneY, y2: laneY, stroke: '#ccd2c9' }));
-    if (isLag(model.lag) && model.lag < 24 && catchTime >= start && catchTime <= end) {
-      const marker = shape('rect', { x: x(catchTime) - 4, y: laneY - 4, width: 8, height: 8, fill: color });
-      marker.append(shape('title', {}, `${model.label}: ${model.lag} hours after onset`));
-      svg.append(marker);
-    } else svg.append(shape('text', { x: 690, y: laneY - 10, 'text-anchor': 'end' }, !isLag(model.lag) ? 'Unavailable' : model.lag === 24 ? '24h / capped' : 'Catch outside plotted window'));
-  });
+
 }
 
 document.getElementById('spike-select').addEventListener('change', event => renderSpike(Number(event.target.value)));
@@ -145,6 +137,6 @@ document.getElementById('spike-jump').addEventListener('click', () => {
   const index = replay.hours.findIndex(hour => hour.hour === record.spike_hour);
   if (index < 0) return;
   selectHour(index);
-  element('snapshot-title').scrollIntoView({ block: 'start', behavior: 'instant' });
+  showView('explore');
   element('timeline').focus({ preventScroll: true });
 });
