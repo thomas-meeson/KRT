@@ -73,6 +73,8 @@ def predict(history: pd.DataFrame, now: pd.Timestamp, horizon: int = 1) -> pd.Se
 
 **The golden rule:** a predictor may only read rows with `hour <= now`. `backtest.py` enforces this by only passing those rows, but don't load the parquet yourself inside a predictor.
 
+For speed, `backtest.py` passes only the **last 8 days** of history by default (`--history-days`), sorted by `hour`. If a feature needs more (e.g. same hour 2 weeks ago), tell Computing to raise it.
+
 Register each predictor in `predictors/__init__.py`:
 ```python
 from .baselines import last_hour, last_24h_mean, same_hour_yesterday
@@ -184,6 +186,9 @@ Rules:
 - `spikes`: up to **10** of the biggest spikes in the replay day, each with views from 2 hours before to 6 hours after the spike.
 - Timestamps in ISO format with `Z`.
 - Hit rates are fractions (0–1), not percentages.
+- The keys are always `last_hour` and `our_model`. Two extra top-level fields: `our_model_name` (which
+  predictor `our_model` actually is, e.g. `"xgboost"`) and `summary.oracle_hit_rate` (the ceiling).
+  A spike's `views` are 0 for hours that are missing or past the end of the data.
 
 **Design Eng:** copy this example into `out/demo.json`, invent more hours, and build the demo against it tonight. The real file will have exactly this shape.
 
