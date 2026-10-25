@@ -11,7 +11,7 @@
       "hour": "2026-10-22T00:00:00Z",
       "hit_rate": {
         "last_hour": 0.4076,
-        "our_model": 0.4088
+        "our_model": 0.4093
       },
       "total_views": 4864392,
       "top_pages": [
@@ -421,7 +421,7 @@
       "hour": "2026-10-22T01:00:00Z",
       "hit_rate": {
         "last_hour": 0.4175,
-        "our_model": 0.4152
+        "our_model": 0.4168
       },
       "total_views": 5108791,
       "top_pages": [
@@ -470,7 +470,7 @@
           "views": 8267,
           "cached": {
             "last_hour": true,
-            "our_model": false
+            "our_model": true
           }
         },
         {
@@ -831,7 +831,7 @@
       "hour": "2026-10-22T02:00:00Z",
       "hit_rate": {
         "last_hour": 0.429,
-        "our_model": 0.428
+        "our_model": 0.429
       },
       "total_views": 5512473,
       "top_pages": [
@@ -1241,7 +1241,7 @@
       "hour": "2026-10-22T03:00:00Z",
       "hit_rate": {
         "last_hour": 0.4346,
-        "our_model": 0.4345
+        "our_model": 0.4349
       },
       "total_views": 5466078,
       "top_pages": [
@@ -1651,7 +1651,7 @@
       "hour": "2026-10-22T04:00:00Z",
       "hit_rate": {
         "last_hour": 0.416,
-        "our_model": 0.4167
+        "our_model": 0.4172
       },
       "total_views": 4804167,
       "top_pages": [
@@ -3291,7 +3291,7 @@
       "hour": "2026-10-22T08:00:00Z",
       "hit_rate": {
         "last_hour": 0.3964,
-        "our_model": 0.396
+        "our_model": 0.3973
       },
       "total_views": 3408661,
       "top_pages": [
@@ -3492,7 +3492,7 @@
           "views": 2441,
           "cached": {
             "last_hour": true,
-            "our_model": false
+            "our_model": true
           }
         },
         {
@@ -4111,7 +4111,7 @@
       "hour": "2026-10-22T10:00:00Z",
       "hit_rate": {
         "last_hour": 0.3921,
-        "our_model": 0.3937
+        "our_model": 0.3943
       },
       "total_views": 3470567,
       "top_pages": [
@@ -4521,7 +4521,7 @@
       "hour": "2026-10-22T11:00:00Z",
       "hit_rate": {
         "last_hour": 0.394,
-        "our_model": 0.3965
+        "our_model": 0.3964
       },
       "total_views": 3677842,
       "top_pages": [
@@ -4931,7 +4931,7 @@
       "hour": "2026-10-22T12:00:00Z",
       "hit_rate": {
         "last_hour": 0.3994,
-        "our_model": 0.4015
+        "our_model": 0.4017
       },
       "total_views": 4084943,
       "top_pages": [
@@ -5751,7 +5751,7 @@
       "hour": "2026-10-22T14:00:00Z",
       "hit_rate": {
         "last_hour": 0.3941,
-        "our_model": 0.3956
+        "our_model": 0.3952
       },
       "total_views": 4944505,
       "top_pages": [
@@ -6096,7 +6096,7 @@
           "views": 2244,
           "cached": {
             "last_hour": false,
-            "our_model": true
+            "our_model": false
           }
         },
         {
@@ -6161,7 +6161,7 @@
       "hour": "2026-10-22T15:00:00Z",
       "hit_rate": {
         "last_hour": 0.3918,
-        "our_model": 0.3931
+        "our_model": 0.393
       },
       "total_views": 5162026,
       "top_pages": [
@@ -6571,7 +6571,7 @@
       "hour": "2026-10-22T16:00:00Z",
       "hit_rate": {
         "last_hour": 0.3911,
-        "our_model": 0.3921
+        "our_model": 0.3923
       },
       "total_views": 5289740,
       "top_pages": [
@@ -6981,7 +6981,7 @@
       "hour": "2026-10-22T17:00:00Z",
       "hit_rate": {
         "last_hour": 0.3929,
-        "our_model": 0.394
+        "our_model": 0.3942
       },
       "total_views": 5427386,
       "top_pages": [
@@ -7801,7 +7801,7 @@
       "hour": "2026-10-22T19:00:00Z",
       "hit_rate": {
         "last_hour": 0.3888,
-        "our_model": 0.3908
+        "our_model": 0.3899
       },
       "total_views": 5793862,
       "top_pages": [
@@ -8621,7 +8621,7 @@
       "hour": "2026-10-22T21:00:00Z",
       "hit_rate": {
         "last_hour": 0.4236,
-        "our_model": 0.4229
+        "our_model": 0.4231
       },
       "total_views": 6197706,
       "top_pages": [
@@ -9031,7 +9031,7 @@
       "hour": "2026-10-22T22:00:00Z",
       "hit_rate": {
         "last_hour": 0.4115,
-        "our_model": 0.4125
+        "our_model": 0.4124
       },
       "total_views": 5664334,
       "top_pages": [
@@ -9441,7 +9441,7 @@
       "hour": "2026-10-22T23:00:00Z",
       "hit_rate": {
         "last_hour": 0.4089,
-        "our_model": 0.4105
+        "our_model": 0.4107
       },
       "total_views": 5104288,
       "top_pages": [
@@ -10153,7 +10153,7 @@
   "summary": {
     "hit_rate": {
       "last_hour": 0.4047,
-      "our_model": 0.4057
+      "our_model": 0.4059
     },
     "oracle_hit_rate": 0.4166,
     "foresight_curve": {
@@ -10171,10 +10171,10 @@
           0.374
         ],
         "our_model": [
-          0.4057,
-          0.3987,
-          0.3936,
-          0.3862
+          0.4059,
+          0.399,
+          0.3942,
+          0.3867
         ]
       }
     }
