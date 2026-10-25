@@ -48,8 +48,9 @@ def find_spikes(df: pd.DataFrame, first: pd.Timestamp, last: pd.Timestamp) -> pd
         return pd.DataFrame(columns=["page", "spike_hour", "views"])
     full = pd.date_range(first - 24 * HOUR, last, freq="h")
     sub = df[df["page"].isin(cands) & (df["hour"] >= full[0]) & (df["hour"] <= last)]
-    M = sub.pivot_table(index="hour", columns="page", values="views", aggfunc="sum").reindex(full).fillna(0).to_numpy()
-    pages = sub.pivot_table(index="hour", columns="page", values="views", aggfunc="sum").columns.to_numpy()
+    wide = sub.pivot_table(index="hour", columns="page", values="views", aggfunc="sum")
+    pages = wide.columns.to_numpy()
+    M = wide.reindex(full).fillna(0).to_numpy()
     rows, prev = [], np.zeros(M.shape[1], bool)
     for i in range(24, len(full)):
         med = np.median(M[i - 24:i], axis=0)
@@ -98,11 +99,13 @@ def run(df: pd.DataFrame, predictors: dict, sizes: list[int], horizons: list[int
     demo_cache = {}          # (pred, target) -> set of top demo_size pages (replay day, h=1)
     timing = {name: 0.0 for name in all_preds}
 
-    for now in test_nows:
+    loop_start = time.time()
+    for i_now, now in enumerate(test_nows, start=1):
         lo = np.searchsorted(hour_arr, (now - pd.Timedelta(days=history_days)).to_datetime64(), side="right") \
             if history_days > 0 else 0
         hi = np.searchsorted(hour_arr, now.to_datetime64(), side="right")
         history = df.iloc[lo:hi]
+        same_for_all_h = {}          # predictions of horizon-independent predictors, computed once per hour
         for h in horizons:
             target = now + h * HOUR
             actual = by_hour.get(target)
@@ -111,7 +114,14 @@ def run(df: pd.DataFrame, predictors: dict, sizes: list[int], horizons: list[int
             total = actual.sum()
             for name, fn in all_preds.items():
                 t0 = time.time()
-                pred = actual.astype(float) if fn is None else fn(history, now, h)
+                if fn is None:
+                    pred = actual.astype(float)
+                elif getattr(fn, "horizon_independent", False):
+                    if name not in same_for_all_h:
+                        same_for_all_h[name] = fn(history, now, h)
+                    pred = same_for_all_h[name]
+                else:
+                    pred = fn(history, now, h)
                 timing[name] += time.time() - t0
                 if not pred.index.is_unique:
                     raise ValueError(f"predictor '{name}' returned duplicate page names at {now}")
@@ -130,8 +140,9 @@ def run(df: pd.DataFrame, predictors: dict, sizes: list[int], horizons: list[int
                 if h == 1 and target.normalize() == replay_day:
                     demo_cache[(name, target)] = set(top[:demo_size])
                     hit.setdefault((name, demo_size, "demo"), []).append((target, rate(demo_size)))
-        if now.hour % 12 == 0:
-            print(f"  scored up to {now}")
+        elapsed = time.time() - loop_start
+        print(f"  [{i_now}/{len(test_nows)}] {now}  ({elapsed:.0f}s so far, "
+              f"~{elapsed / i_now * (len(test_nows) - i_now):.0f}s left)", flush=True)
 
     def catch_lag(name, n, h, page, s):
         for lag in range(0, MAX_LAG + 1):
@@ -225,11 +236,25 @@ def main() -> None:
     ap.add_argument("--test-days", type=float, default=3)
     ap.add_argument("--history-days", type=float, default=8)
     ap.add_argument("--demo-size", type=int, default=10000)
+    ap.add_argument("--predictors", nargs="+", default=None,
+                    help="only run these (e.g. --predictors last_hour decay); last_hour is always included")
+    ap.add_argument("--top", type=int, default=150_000, help="keep only the top N pages per hour (speed)")
     args = ap.parse_args()
 
+    t0 = time.time()
     df = pd.read_parquet(args.data)
+    if args.top:
+        df = (df.sort_values(["hour", "views"], ascending=[True, False], kind="stable")
+                .groupby("hour", sort=False).head(args.top))
+    print(f"loaded {len(df):,} rows ({df['hour'].nunique()} hours) in {time.time() - t0:.0f}s", flush=True)
+    preds = PREDICTORS
+    if args.predictors:
+        unknown = set(args.predictors) - set(PREDICTORS)
+        if unknown:
+            raise SystemExit(f"unknown predictors {sorted(unknown)}; available: {sorted(PREDICTORS)}")
+        preds = {k: v for k, v in PREDICTORS.items() if k in set(args.predictors) | {"last_hour"}}
     sizes = sorted(set(args.sizes) | {args.demo_size})
-    results, demo = run(df, PREDICTORS, sizes, args.horizons, args.test_days, args.history_days, args.demo_size)
+    results, demo = run(df, preds, sizes, args.horizons, args.test_days, args.history_days, args.demo_size)
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
