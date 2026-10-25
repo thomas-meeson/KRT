@@ -8,6 +8,10 @@ prediction(now + h) = baseline + excess_now * f(t + h) / f(t)
                power law (1 + t/tau)^-alpha, or exponential exp(-t/tau)
 Falls back to a power law with alpha = 1, tau = 1 if no fit has been saved yet.
 
+The decay is only applied to pages that actually spiked in the last 24 h (peak >= 3x the page's
+median and at least 100 views above it). Every other page is predicted as "same as the latest hour",
+because for steady pages that beats a 24 h median (which ignores the daily rhythm).
+
 Same maths as Physics's original version; the 24 h table is built with numpy instead of
 pivot_table (much faster), and rows are found by binary search on the sorted hour column.
 """
@@ -22,6 +26,8 @@ import pandas as pd
 HOUR = pd.Timedelta(hours=1)
 PARAMS_PATH = Path(__file__).resolve().parent.parent / "models" / "decay_params.json"
 CANDIDATES = 200_000
+SPIKE_FACTOR = 3.0        # peak must be >= 3x the 24 h median ...
+SPIKE_MIN_EXCESS = 100.0  # ... and at least 100 views above it, to count as a spike
 
 _params = None
 
@@ -72,4 +78,7 @@ def decay_predict(history: pd.DataFrame, now: pd.Timestamp, horizon: int = 1) ->
     t_now = t + (now - hours[-1]) / HOUR             # if `now` itself is missing, the last data is older
     excess = np.clip(last - base, 0, None)
     factor = _f(t_now + horizon, p) / _f(t, p)
-    return pd.Series(np.clip(base + excess * factor, 0, None), index=pages[keep])
+    peak = V.max(axis=1)
+    spiked = (peak >= SPIKE_FACTOR * base) & (peak - base >= SPIKE_MIN_EXCESS)
+    pred = np.where(spiked, base + excess * factor, last)
+    return pd.Series(np.clip(pred, 0, None), index=pages[keep])

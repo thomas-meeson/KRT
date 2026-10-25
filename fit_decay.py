@@ -9,10 +9,13 @@ Method:
      24 h later, subtract the page's baseline (median of the 24 h before the spike), and divide
      by the excess at the peak. Every spike then starts at 1 and decays towards 0.
   3. Take the median across spikes at each hour since the peak (robust to odd pages).
-  4. Fit two curves to it, in log space (so the long tail counts, not just the first hours):
+  4. Fit two curves to the DECAY PHASE only (peak until the median stops falling, at most 12 h),
+     in log space:
          power law     f(t) = (1 + t/tau) ** -alpha
          exponential   f(t) = exp(-t/tau)
-     and keep the one with the smaller error.
+     and keep the one with the smaller error. After that, attention rises again about a day later
+     (the "daily echo": people come back at the same time the next day); that is measured and
+     reported separately rather than forced into the same curve.
   5. Save models/decay_params.json (read by decay_predict.py) and out/decay_fit.png (for the slides).
 
 Usage:
@@ -32,7 +35,7 @@ from scipy.optimize import curve_fit
 
 from backtest import HOUR, find_spikes
 
-MAX_T = 24          # hours after the peak used for fitting
+MAX_T = 30          # hours after the peak kept (long enough to see the next-day echo)
 
 
 def power(t, alpha, tau):
@@ -77,30 +80,57 @@ def spike_curves(df: pd.DataFrame, train_end: pd.Timestamp) -> tuple[np.ndarray,
     return np.array(curves), len(spikes)
 
 
-def fit(curves: np.ndarray) -> dict:
+def fit(curves: np.ndarray, max_fit_h: int = 12) -> dict:
+    """Fit the early decay phase only; measure the next-day echo separately.
+
+    The median curve falls steeply for a few hours, bottoms out, then rises again about 24 h after the
+    peak (people come back at the same time the next day). One smooth curve can't describe both, so:
+      - decay phase: from the peak to where the median stops falling (at most max_fit_h hours)
+      - daily echo:  the highest point 18-30 h after the peak, compared with the trough before it
+    """
     t = np.arange(MAX_T + 1, dtype=float)
     with np.errstate(all="ignore"), warnings.catch_warnings():
         warnings.simplefilter("ignore", RuntimeWarning)   # hours with no spike data yet
         med = np.nanmedian(curves, axis=0)
     n_per_t = np.sum(~np.isnan(curves), axis=0)
-    ok = (med > 0) & (n_per_t >= 5)
-    if ok.sum() < 4:
-        raise SystemExit("not enough spike data to fit a curve yet")
-    tt, yy = t[ok], np.log(med[ok])
+    valid = (med > 0) & (n_per_t >= 5)
+
+    # End of the decay phase: first hour (after 3 h) where the median stops falling.
+    fit_end = 0
+    for k in range(1, min(max_fit_h, MAX_T) + 1):
+        if not valid[k]:
+            break
+        if k > 3 and med[k] >= med[k - 1]:
+            break
+        fit_end = k
+    if fit_end < 3:
+        raise SystemExit("not enough spike data to fit the decay phase yet")
+    win = valid & (t <= fit_end)
+    tt, yy = t[win], np.log(med[win])
+
     res = {}
     (a, tau_p), _ = curve_fit(lambda x, a, tau: np.log(power(x, a, tau)), tt, yy, p0=[1.0, 1.0],
-                              bounds=([0.01, 0.01], [10.0, 100.0]))
+                              bounds=([0.05, 0.1], [10.0, 100.0]))
     res["power"] = {"alpha": float(a), "tau": float(tau_p),
                     "rmse_log": float(np.sqrt(np.mean((np.log(power(tt, a, tau_p)) - yy) ** 2)))}
-    (tau_e,), _ = curve_fit(lambda x, tau: np.log(exponential(x, tau)), tt, yy, p0=[3.0], bounds=([0.01], [500.0]))
+    (tau_e,), _ = curve_fit(lambda x, tau: np.log(exponential(x, tau)), tt, yy, p0=[1.0], bounds=([0.05], [500.0]))
     res["exponential"] = {"tau": float(tau_e),
                           "rmse_log": float(np.sqrt(np.mean((np.log(exponential(tt, tau_e)) - yy) ** 2)))}
     best = min(res, key=lambda k: res[k]["rmse_log"])
     p = res[best]
     half_life = p["tau"] * (2 ** (1 / p["alpha"]) - 1) if best == "power" else p["tau"] * np.log(2)
+
+    echo = {}
+    late = valid & (t >= 18)
+    trough_zone = valid & (t >= fit_end) & (t < 18)
+    if late.any() and trough_zone.any():
+        j = int(t[late][np.argmax(med[late])])
+        trough = float(med[trough_zone].min())
+        echo = {"hours_after_peak": j, "level": float(med[j]), "trough": trough,
+                "echo_over_trough": float(med[j] / trough) if trough > 0 else None}
     return {"model": best, "alpha": p.get("alpha", 1.0), "tau": p["tau"], "half_life_h": float(half_life),
-            "candidates": res, "median_curve": [None if np.isnan(x) else float(x) for x in med],
-            "spikes_per_hour": n_per_t.tolist()}
+            "fit_window_h": int(fit_end), "candidates": res, "echo": echo,
+            "median_curve": [None if np.isnan(x) else float(x) for x in med], "spikes_per_hour": n_per_t.tolist()}
 
 
 def plot(params: dict, out: Path) -> None:
@@ -110,21 +140,38 @@ def plot(params: dict, out: Path) -> None:
 
     t = np.arange(MAX_T + 1, dtype=float)
     med = np.array([np.nan if x is None else x for x in params["median_curve"]])
-    fig, ax = plt.subplots(figsize=(6.5, 4.5))
+    w = params["fit_window_h"]
+    fig, ax = plt.subplots(figsize=(7.5, 4.6))
+    fig.set_facecolor("#fcfcfb"); ax.set_facecolor("#fcfcfb")
+    ax.axvspan(-0.3, w + 0.3, color="#e8eef8", zorder=0)
+    ax.text(w / 2, 1.25, "decay phase (fitted)", ha="center", fontsize=9, color="#52514e")
     ok = med > 0
-    ax.loglog(t[ok] + 1, med[ok], "o", color="black", label=f"median of {params['n_spikes_used']} real spikes")
-    tf = np.linspace(0, MAX_T, 200)
+    ax.semilogy(t[ok], med[ok], "o", color="#0b0b0b", markersize=6, label=f"median of {params['n_spikes_used']} spikes")
     c = params["candidates"]
-    ax.loglog(tf + 1, power(tf, c["power"]["alpha"], c["power"]["tau"]), "-",
-              label=f"power law: alpha={c['power']['alpha']:.2f}, tau={c['power']['tau']:.2f}")
-    ax.loglog(tf + 1, exponential(tf, c["exponential"]["tau"]), "--",
-              label=f"exponential: tau={c['exponential']['tau']:.2f} h")
-    ax.set_xlabel("hours since peak + 1")
-    ax.set_ylabel("extra views, as a fraction of the peak")
-    ax.set_title(f"How Wikipedia attention fades (half-life {params['half_life_h']:.1f} h, best: {params['model']})")
-    ax.legend(fontsize=8)
+    tf = np.linspace(0, w, 100)
+    tl = np.linspace(w, MAX_T, 100)
+    for model, color, lab in [("exponential", "#2a78d6", f"exponential: tau = {c['exponential']['tau']:.2f} h"),
+                              ("power", "#eb6834", f"power law: alpha = {c['power']['alpha']:.2f}, tau = {c['power']['tau']:.2f} h")]:
+        f = (lambda x: exponential(x, c["exponential"]["tau"])) if model == "exponential" else \
+            (lambda x: power(x, c["power"]["alpha"], c["power"]["tau"]))
+        best = " (best)" if params["model"] == model else ""
+        ax.semilogy(tf, f(tf), "-", color=color, linewidth=2, label=lab + best)
+        ax.semilogy(tl, f(tl), ":", color=color, linewidth=1.2)
+    e = params.get("echo") or {}
+    if e:
+        ax.annotate(f"daily echo, {e['hours_after_peak']} h after the peak",
+                    xy=(e["hours_after_peak"], e["level"]), xytext=(e["hours_after_peak"] - 9, e["level"] * 6),
+                    fontsize=9, color="#0b0b0b", arrowprops=dict(arrowstyle="->", color="#52514e"))
+    ax.set_ylim(max(np.nanmin(med[ok]) / 4, 1e-4), 2)
+    ax.set_xlabel("hours since the peak")
+    ax.set_ylabel("extra views, as a fraction of the peak (log scale)")
+    ax.set_title(f"After a spike, attention halves every {params['half_life_h'] * 60:.0f} minutes, then echoes a day later",
+                 fontsize=11, loc="left")
+    for side in ("top", "right"):
+        ax.spines[side].set_visible(False)
+    ax.legend(fontsize=8, frameon=False, loc="upper right")
     fig.tight_layout()
-    fig.savefig(out, dpi=140)
+    fig.savefig(out, dpi=150)
     plt.close(fig)
 
 
@@ -156,7 +203,13 @@ def main() -> None:
     print(f"{len(curves)} spikes used (of {n_spikes} found)")
     print(f"power law:   alpha={c['power']['alpha']:.3f}, tau={c['power']['tau']:.3f}  (log error {c['power']['rmse_log']:.3f})")
     print(f"exponential: tau={c['exponential']['tau']:.3f} h  (log error {c['exponential']['rmse_log']:.3f})")
-    print(f"best: {params['model']}, half-life of attention {params['half_life_h']:.1f} h")
+    print(f"decay phase fitted on the first {params['fit_window_h']} h after the peak")
+    print(f"best: {params['model']}, half-life of attention {params['half_life_h']:.2f} h "
+          f"({params['half_life_h'] * 60:.0f} minutes)")
+    e = params.get("echo") or {}
+    if e:
+        print(f"daily echo: {e['hours_after_peak']} h after the peak, extra attention is back up to {e['level']:.1%} "
+              f"of the peak ({e['echo_over_trough']:.1f}x the trough of {e['trough']:.1%})")
     print("wrote models/decay_params.json and out/decay_fit.png")
 
 

@@ -22,7 +22,7 @@ DECAY_PATH = Path(__file__).resolve().parent.parent / "models" / "decay_params.j
 
 FEATURES = ([f"lag_{k}" for k in LAGS] +
             ["diff_1", "diff_3", "diff_24", "mean_24", "max_24", "std_24", "hours_since_peak",
-             "peak_over_now", "hours_present", "decay_pred", "hour_of_day", "day_of_week"])
+             "peak_over_now", "hours_present", "decay_pred", "is_spike", "hour_of_day", "day_of_week"])
 
 _decay = None
 
@@ -96,12 +96,17 @@ def make_features(W: np.ndarray, now: pd.Timestamp) -> pd.DataFrame:
         latest = _latest(W)
         f["peak_over_now"] = np.log1p(filled.max(axis=1).clip(min=0)) - np.log1p(np.nan_to_num(latest))
         f["hours_present"] = np.sum(np.nan_to_num(W[:, 1:]) > 0, axis=1).astype(float)
-        # Physics's decay model as a feature: baseline + excess * f(t+1)/f(t)
+        # Physics's decay model as a feature (same rule as predictors/decay_predict.py): pages that
+        # spiked get baseline + excess * f(t+1)/f(t); every other page gets its latest views.
         p = _decay_params()
-        base = np.nanmedian(W[:, 1:], axis=1)
-        excess = np.clip(np.nan_to_num(latest) - np.nan_to_num(base), 0, None)
-        f["decay_pred"] = np.log1p(np.clip(np.nan_to_num(base) + excess * _decay_f(hours_since_peak + 1, p) /
-                                           _decay_f(hours_since_peak, p), 0, None))
+        base = np.nan_to_num(np.nanmedian(W[:, 1:], axis=1))
+        last = np.nan_to_num(latest)
+        excess = np.clip(last - base, 0, None)
+        peak_val = filled.max(axis=1).clip(min=0)
+        spiked = (peak_val >= 3.0 * base) & (peak_val - base >= 100.0)
+        decayed = base + excess * _decay_f(hours_since_peak + 1, p) / _decay_f(hours_since_peak, p)
+        f["decay_pred"] = np.log1p(np.clip(np.where(spiked, decayed, last), 0, None))
+        f["is_spike"] = spiked.astype(float)
     f["hour_of_day"] = np.full(W.shape[0], now.hour, dtype=float)
     f["day_of_week"] = np.full(W.shape[0], now.dayofweek, dtype=float)
     return pd.DataFrame(f)[FEATURES]

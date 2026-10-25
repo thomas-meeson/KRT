@@ -9,6 +9,7 @@ Also runs the "oracle" (cheats: uses the real future) as the ceiling, detects sp
 how many hours late each predictor caught them, bootstraps confidence intervals over hours,
 and writes:
     out/results.csv   one row per predictor x cache size x horizon
+    out/hourly.csv    hit rate per predictor x cache size x horizon x hour (for paired tests)
     out/demo.json     replay of the last full test day for the demo (INTERFACES.md section 4)
 
 Speed: by default each predictor gets only the last --history-days days of history (still all
@@ -34,6 +35,7 @@ HOUR = pd.Timedelta(hours=1)
 SPIKE_MIN_VIEWS = 1000
 SPIKE_FACTOR = 10
 MAX_LAG = 24
+SPIKE_WINDOW = 6          # hours after a spike's onset counted in spike_hit_rate
 
 
 def iso(t) -> str:
@@ -154,7 +156,21 @@ def run(df: pd.DataFrame, predictors: dict, sizes: list[int], horizons: list[int
                 return lag
         return MAX_LAG
 
-    rows = []
+    def spike_hit_rate(name, n, h):
+        """Share of spike pages' views, in the first SPIKE_WINDOW hours after onset, served from cache."""
+        got = tot = 0.0
+        for r in spikes.itertuples():
+            for k in range(SPIKE_WINDOW):
+                t = r.spike_hour + k * HOUR
+                ranks, actual = spike_rank.get((name, h, t)), by_hour.get(t)
+                if ranks is None or actual is None:
+                    continue
+                v = float(actual.get(r.page, 0))
+                tot += v
+                got += v if ranks.get(r.page, max_n) < n else 0.0
+        return got / tot if tot else float("nan")
+
+    rows, hourly = [], []
     for (name, n, h), vals in hit.items():
         if h == "demo":
             continue
@@ -163,12 +179,15 @@ def run(df: pd.DataFrame, predictors: dict, sizes: list[int], horizons: list[int
         lags = [catch_lag(name, n, h, r.page, r.spike_hour) for r in spikes.itertuples()]
         rows.append({"predictor": name, "cache_size": n, "horizon": h, "hit_rate": round(float(x.mean()), 4),
                      "hit_rate_ci_low": round(lo_ci, 4), "hit_rate_ci_high": round(hi_ci, 4),
-                     "median_catch_lag_h": float(np.median(lags)) if lags else float("nan"), "n_hours": len(x)})
+                     "median_catch_lag_h": float(np.median(lags)) if lags else float("nan"),
+                     "spike_hit_rate": round(spike_hit_rate(name, n, h), 4), "n_hours": len(x)})
+        hourly += [{"predictor": name, "cache_size": n, "horizon": h, "target_hour": t, "hit_rate": v} for t, v in vals]
     results = pd.DataFrame(rows).sort_values(["horizon", "cache_size", "hit_rate"], ascending=[True, True, False])
+    hourly = pd.DataFrame(hourly)
 
     print("time spent per predictor (s): " + ", ".join(f"{k} {v:.1f}" for k, v in timing.items()))
     demo = build_demo(results, hit, demo_cache, spikes, by_hour, replay_day, demo_size, horizons, catch_lag)
-    return results, demo
+    return results, demo, hourly
 
 
 def build_demo(results, hit, demo_cache, spikes, by_hour, replay_day, demo_size, horizons, catch_lag) -> dict:
@@ -254,11 +273,12 @@ def main() -> None:
             raise SystemExit(f"unknown predictors {sorted(unknown)}; available: {sorted(PREDICTORS)}")
         preds = {k: v for k, v in PREDICTORS.items() if k in set(args.predictors) | {"last_hour"}}
     sizes = sorted(set(args.sizes) | {args.demo_size})
-    results, demo = run(df, preds, sizes, args.horizons, args.test_days, args.history_days, args.demo_size)
+    results, demo, hourly = run(df, preds, sizes, args.horizons, args.test_days, args.history_days, args.demo_size)
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     results.to_csv(out / "results.csv", index=False)
+    hourly.to_csv(out / "hourly.csv", index=False)          # per-hour hit rates, for paired comparisons
     (out / "demo.json").write_text(json.dumps(demo, indent=2))
 
     print("\nHit rate, horizon 1 (higher is better):")
@@ -273,6 +293,9 @@ def main() -> None:
     lag = results[(results["horizon"] == 1) & (results["cache_size"] == args.demo_size)].set_index("predictor")["median_catch_lag_h"]
     print("\nMedian hours late catching a spike (N=%d, horizon 1): " % args.demo_size +
           ", ".join(f"{k} {v:g}" for k, v in lag.items()))
+    sh = results[(results["horizon"] == 1) & (results["cache_size"] == args.demo_size)].set_index("predictor")["spike_hit_rate"]
+    print(f"Share of spike pages' views in the first {SPIKE_WINDOW} h served from cache (N={args.demo_size}, horizon 1): " +
+          ", ".join(f"{k} {v:.1%}" for k, v in sh.sort_values(ascending=False).items()))
     print(f"\nwrote {out / 'results.csv'} and {out / 'demo.json'} (our_model = {demo['our_model_name']})")
 
 
