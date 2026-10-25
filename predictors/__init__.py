@@ -10,6 +10,6 @@ PREDICTORS = {
     "last_24h_mean": last_24h_mean,               # ~ "least frequently used"
     "same_hour_yesterday": same_hour_yesterday,   # daily rhythm
     # "xgboost": xgb_predict,                     # Computing
-    # "decay": decay_predict,                     # Physics
+      "decay": decay_predict,                     # Physics
     # "transformer": transformer_predict,         # Computing
 }
